@@ -112,19 +112,13 @@ public struct ScheduleEngine: Sendable {
         guard templates.contains(where: { $0.id == input.cycleAnchor.nextWorkoutID }) else {
             return .needsRepair(reason: .missingAnchorWorkout)
         }
-        guard input.completedSessions.allSatisfy({ session in
-            templates.contains(where: { $0.id == session.workoutTemplateID })
-        }) else {
-            return .needsRepair(reason: .completedSessionReferencesMissingWorkout)
-        }
-
         guard let latestSession = input.completedSessions.max(by: { lhs, rhs in
             if lhs.finishedAt != rhs.finishedAt {
                 return lhs.finishedAt < rhs.finishedAt
             }
             return lhs.id.uuidString < rhs.id.uuidString
         }) else {
-            return state(
+            return makeScheduleState(
                 workoutID: input.cycleAnchor.nextWorkoutID,
                 dueDay: input.cycleAnchor.firstDueDomainDay,
                 currentDay: input.currentDomainDay,
@@ -145,7 +139,7 @@ public struct ScheduleEngine: Sendable {
             calendar: input.calendar
         )
 
-        return state(
+        return makeScheduleState(
             workoutID: nextWorkout.id,
             dueDay: eligibleDay,
             currentDay: input.currentDomainDay,
@@ -153,7 +147,7 @@ public struct ScheduleEngine: Sendable {
         )
     }
 
-    private func state(
+    private func makeScheduleState(
         workoutID: UUID,
         dueDay: DomainDay,
         currentDay: DomainDay,

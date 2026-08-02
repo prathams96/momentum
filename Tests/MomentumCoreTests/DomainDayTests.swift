@@ -1,9 +1,8 @@
 import Foundation
-import Testing
+import XCTest
 @testable import MomentumCore
 
-struct DomainDayTests {
-    @Test
+final class DomainDayTests: XCTestCase {
     func test_dateBeforeCutoffBelongsToPreviousDomainDay() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Kolkata")!
@@ -23,10 +22,9 @@ struct DomainDayTests {
             cutoffMinutes: 180
         )
 
-        #expect(result == DomainDay(year: 2026, month: 8, day: 1))
+        XCTAssertEqual(result, DomainDay(year: 2026, month: 8, day: 1))
     }
 
-    @Test
     func test_exactlyAtCutoffBelongsToCurrentDomainDay() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Kolkata")!
@@ -45,10 +43,9 @@ struct DomainDayTests {
             cutoffMinutes: 180
         )
 
-        #expect(result == DomainDay(year: 2026, month: 8, day: 2))
+        XCTAssertEqual(result, DomainDay(year: 2026, month: 8, day: 2))
     }
 
-    @Test
     func test_addingDomainDaysUsesCalendarDaysAcrossDST() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/New_York")!
@@ -56,10 +53,9 @@ struct DomainDayTests {
 
         let result = day.adding(days: 1, calendar: calendar)
 
-        #expect(result == DomainDay(year: 2026, month: 3, day: 9))
+        XCTAssertEqual(result, DomainDay(year: 2026, month: 3, day: 9))
     }
 
-    @Test
     func test_sameTimestampUsesSuppliedTimeZone() {
         let date = Date(timeIntervalSince1970: 1785637800)
         var indiaCalendar = Calendar(identifier: .gregorian)
@@ -78,7 +74,7 @@ struct DomainDayTests {
             cutoffMinutes: 180
         )
 
-        #expect(indiaDay == DomainDay(year: 2026, month: 8, day: 2))
-        #expect(newYorkDay == DomainDay(year: 2026, month: 8, day: 1))
+        XCTAssertEqual(indiaDay, DomainDay(year: 2026, month: 8, day: 2))
+        XCTAssertEqual(newYorkDay, DomainDay(year: 2026, month: 8, day: 1))
     }
 }
