@@ -5,12 +5,25 @@ enum ModelContainerFactory {
 
     static let schema = Schema([
         AppSettingsRecord.self,
+        NutritionTargetRecord.self,
         WorkoutTemplateRecord.self,
         CycleAnchorRecord.self,
         ExercisePrescriptionRecord.self,
         ExerciseAlternativeRecord.self,
+        WorkoutSessionRecord.self,
+        ExerciseLogRecord.self,
+        SetLogRecord.self,
+        WorkoutDayEventRecord.self,
+        LoadSuggestionRecord.self,
+        FoodPresetRecord.self,
+        FoodEntryRecord.self,
+        NutritionDayRecord.self,
         CareRoutineTemplateRecord.self,
-        CareTaskTemplateRecord.self
+        CareTaskTemplateRecord.self,
+        CareOccurrenceRecord.self,
+        CareTaskCompletionRecord.self,
+        BodyMeasurementRecord.self,
+        MilestoneRecord.self
     ])
 
     static func makeProduction() throws -> ModelContainer {

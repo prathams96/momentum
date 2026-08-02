@@ -4,11 +4,7 @@ import SwiftData
 @main
 @MainActor
 struct MomentumApp: App {
-    private let bootstrap: PersistenceBootstrap
-
-    init() {
-        bootstrap = PersistenceBootstrap()
-    }
+    @State private var bootstrap = PersistenceBootstrap()
 
     var body: some Scene {
         WindowGroup {
@@ -17,7 +13,9 @@ struct MomentumApp: App {
                 AppShell()
                     .modelContainer(container)
             case .failed:
-                PersistenceUnavailableView()
+                PersistenceUnavailableView {
+                    bootstrap = PersistenceBootstrap()
+                }
             }
         }
     }
@@ -30,7 +28,13 @@ private enum PersistenceBootstrap {
 
     init() {
         let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        if isRunningTests || ProcessInfo.processInfo.arguments.contains("-usePreviewStore") {
+        #if targetEnvironment(simulator)
+        let isRunningInSimulator = true
+        #else
+        let isRunningInSimulator = false
+        #endif
+
+        if isRunningTests || isRunningInSimulator || ProcessInfo.processInfo.arguments.contains("-usePreviewStore") {
             do {
                 let container = try ModelContainerFactory.makePreview()
                 try SeedData.install(in: container.mainContext)
@@ -52,11 +56,19 @@ private enum PersistenceBootstrap {
 }
 
 private struct PersistenceUnavailableView: View {
+    let retry: () -> Void
+
     var body: some View {
-        ContentUnavailableView(
-            "Momentum is unavailable",
-            systemImage: "externaldrive.badge.exclamationmark",
-            description: Text("Try opening the app again. Your local data has not been replaced.")
-        )
+        VStack(spacing: 20) {
+            ContentUnavailableView(
+                "Momentum is unavailable",
+                systemImage: "externaldrive.badge.exclamationmark",
+                description: Text("Your local data has not been replaced. Try opening it again.")
+            )
+
+            Button("Try again", action: retry)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding()
     }
 }

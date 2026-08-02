@@ -8,17 +8,33 @@
 
 /* Begin PBXBuildFile section */
 		0C5205D600F7A38090084B6C /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518ECE49F1DC74E7E096DAF3 /* TodayView.swift */; };
+		274C09979A71031039C391AF /* WorkoutSessionStarter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B3488B4639F019DAF3CA104 /* WorkoutSessionStarter.swift */; };
+		286524FF840404DCF6842C4D /* WorkoutSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1EE7B5A03B91E72C6CC0B1 /* WorkoutSessionView.swift */; };
+		3596142E93905367CE10A8C0 /* FoodEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E0516A274E184AD8C6D80F2 /* FoodEntrySheet.swift */; };
 		40198459694202BDD60F9E02 /* AppShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF468E89A0AFF7D4E13732C /* AppShell.swift */; };
+		4F185B7EAAD5307D658AA65B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 18F44509934DE5411172A086 /* Assets.xcassets */; };
 		53ECA5F1D5F9B2DEAA0407B2 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74F86E88F4662891FE8FB971 /* OnboardingView.swift */; };
+		5A31A87DED952CDCF2D242DD /* DailyReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED7DC642BB270ADDB827CB86 /* DailyReconciler.swift */; };
 		64F0EE37580794A0954FD65D /* MomentumUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA1527FE381955F4E020EA6 /* MomentumUITests.swift */; };
 		72725C7A39900A6DBEE280EA /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D090D983103C774D1A79F13 /* ModelContainerFactory.swift */; };
+		765BCAB17AA5B99EE01D2019 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 857DFAAE6EF601435BFA75EC /* SettingsView.swift */; };
+		7D266F79539CB07F450A2D7A /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACE83CB0C4A93124D0ECF85 /* NotificationScheduler.swift */; };
 		8AAB50CFC88D10E3DE45A4E1 /* SchemaV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = E072B4895EE3EA2FDFA51B07 /* SchemaV1.swift */; };
+		9380186BF062F43DEA685817 /* CSVExportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0201B8A930F6158543DD016A /* CSVExportServiceTests.swift */; };
 		93A64853FD815EAC7A845AA3 /* MomentumCore in Frameworks */ = {isa = PBXBuildFile; productRef = 943E906AAD927231F3850337 /* MomentumCore */; };
 		93CF080CC4587919A6C24D4D /* MomentumApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB577315C556F0E9D1FE31D7 /* MomentumApp.swift */; };
+		B0D5FD18F9D2EEAC0CAA5777 /* ResetAllDataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8301A45E79F89C480AD1D89F /* ResetAllDataService.swift */; };
 		B214406AE014943969EDE500 /* MomentumAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */; };
+		B26D5216FD3F1AF5C2981CEE /* SettingsDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAC0904838B6D1B66197EC /* SettingsDraft.swift */; };
+		D0BE6409EB8003F1787A70B9 /* PersistedDomainDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D654CF1580796FD4CD4709E3 /* PersistedDomainDay.swift */; };
 		D23C4833E0D282C1A7673DE3 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3874E4291A3DB3650264F7E3 /* AppTab.swift */; };
+		D5F1AF81B6FAEB989C0A62DD /* CSVExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B01068415240D94B849EC4C /* CSVExportService.swift */; };
 		DE0CA459D5E3EE1256248969 /* MomentumTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7316759B620D82328D71CB /* MomentumTheme.swift */; };
 		E3951258E29E40BC51AC2A2C /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 021AEB3CD665783BBE52CF25 /* SeedData.swift */; };
+		EE3C431329745C7CF955BCE3 /* SettingsPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D5CFC5434D3E55A23F3368 /* SettingsPersistenceTests.swift */; };
+		F038DB4DB8348CA8F0B9C4FA /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 039CBAB5362B83A6BE6B4FB5 /* Localizable.xcstrings */; };
+		F98A9EE097DF2493C38490BF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8AD9093FBD9C327C0E7849AF /* PrivacyInfo.xcprivacy */; };
+		FF7E74730234AD02DC24E2B9 /* CareRoutineSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48BECDF86FA4CE25EC2DAF01 /* CareRoutineSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,22 +55,38 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0201B8A930F6158543DD016A /* CSVExportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExportServiceTests.swift; sourceTree = "<group>"; };
 		021AEB3CD665783BBE52CF25 /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
+		039CBAB5362B83A6BE6B4FB5 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		1662D511CADD7FAE56F3A95E /* MomentumTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MomentumTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		18F44509934DE5411172A086 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1B7316759B620D82328D71CB /* MomentumTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumTheme.swift; sourceTree = "<group>"; };
+		2A1EE7B5A03B91E72C6CC0B1 /* WorkoutSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSessionView.swift; sourceTree = "<group>"; };
 		3874E4291A3DB3650264F7E3 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
 		422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumAppTests.swift; sourceTree = "<group>"; };
+		48BECDF86FA4CE25EC2DAF01 /* CareRoutineSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareRoutineSheet.swift; sourceTree = "<group>"; };
+		4B01068415240D94B849EC4C /* CSVExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExportService.swift; sourceTree = "<group>"; };
 		518ECE49F1DC74E7E096DAF3 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		5B3488B4639F019DAF3CA104 /* WorkoutSessionStarter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSessionStarter.swift; sourceTree = "<group>"; };
 		74F86E88F4662891FE8FB971 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		8301A45E79F89C480AD1D89F /* ResetAllDataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetAllDataService.swift; sourceTree = "<group>"; };
 		84BF7C2AB11F3A670B6DDC31 /* Momentum.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Momentum.entitlements; sourceTree = "<group>"; };
+		857DFAAE6EF601435BFA75EC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		8AD9093FBD9C327C0E7849AF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		8E0516A274E184AD8C6D80F2 /* FoodEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodEntrySheet.swift; sourceTree = "<group>"; };
+		97D5CFC5434D3E55A23F3368 /* SettingsPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPersistenceTests.swift; sourceTree = "<group>"; };
 		9D090D983103C774D1A79F13 /* ModelContainerFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContainerFactory.swift; sourceTree = "<group>"; };
 		A8DE35226C4BB5209ED75BB5 /* MomentumUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MomentumUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAAAC0904838B6D1B66197EC /* SettingsDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDraft.swift; sourceTree = "<group>"; };
 		AB577315C556F0E9D1FE31D7 /* MomentumApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumApp.swift; sourceTree = "<group>"; };
 		B60228F692B0231F197F01B2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B69EEEA475A7AD0BF07A19EE /* Momentum.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Momentum.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAA1527FE381955F4E020EA6 /* MomentumUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumUITests.swift; sourceTree = "<group>"; };
+		D654CF1580796FD4CD4709E3 /* PersistedDomainDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistedDomainDay.swift; sourceTree = "<group>"; };
 		DBF3B7506D96D5CA0A0CC034 /* fitness-tracker */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "fitness-tracker"; path = .; sourceTree = SOURCE_ROOT; };
 		E072B4895EE3EA2FDFA51B07 /* SchemaV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV1.swift; sourceTree = "<group>"; };
+		EACE83CB0C4A93124D0ECF85 /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
+		ED7DC642BB270ADDB827CB86 /* DailyReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyReconciler.swift; sourceTree = "<group>"; };
 		FAF468E89A0AFF7D4E13732C /* AppShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShell.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -84,6 +116,9 @@
 			isa = PBXGroup;
 			children = (
 				BB0D944D14B4B35EAF1F9C1C /* DesignSystem */,
+				E521080E132752EF19244874 /* Domain */,
+				BE2CB141560D9092840BEAC7 /* Export */,
+				160D402DA6A1A2F4A14B219D /* Notifications */,
 				81F8B31EB610A749DEDF99C3 /* Persistence */,
 			);
 			path = Core;
@@ -95,6 +130,7 @@
 				CF0A01A0D0C38710467E5CE1 /* App */,
 				0E37BA673ADEC314AC412CEF /* Core */,
 				465FDAE7EBD421BE95EB701A /* Features */,
+				A22995A19C0933ED75B70773 /* Resources */,
 				B60228F692B0231F197F01B2 /* Info.plist */,
 				84BF7C2AB11F3A670B6DDC31 /* Momentum.entitlements */,
 				AB577315C556F0E9D1FE31D7 /* MomentumApp.swift */,
@@ -102,13 +138,52 @@
 			path = Momentum;
 			sourceTree = "<group>";
 		};
+		0E652CC4679DB689A8CF79B7 /* Nutrition */ = {
+			isa = PBXGroup;
+			children = (
+				8E0516A274E184AD8C6D80F2 /* FoodEntrySheet.swift */,
+			);
+			path = Nutrition;
+			sourceTree = "<group>";
+		};
+		160D402DA6A1A2F4A14B219D /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				EACE83CB0C4A93124D0ECF85 /* NotificationScheduler.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+		206D2AAEDDA7AB13D8161694 /* WorkoutSession */ = {
+			isa = PBXGroup;
+			children = (
+				5B3488B4639F019DAF3CA104 /* WorkoutSessionStarter.swift */,
+				2A1EE7B5A03B91E72C6CC0B1 /* WorkoutSessionView.swift */,
+			);
+			path = WorkoutSession;
+			sourceTree = "<group>";
+		};
 		465FDAE7EBD421BE95EB701A /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				96A9E983ED34A824185A5CEA /* Care */,
+				0E652CC4679DB689A8CF79B7 /* Nutrition */,
 				F258EACC465431FF70CCFD1A /* Onboarding */,
+				46A5FB17A76514D0EF59DCB8 /* Settings */,
 				EA5D053652E058726BA65EED /* Today */,
+				206D2AAEDDA7AB13D8161694 /* WorkoutSession */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		46A5FB17A76514D0EF59DCB8 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				8301A45E79F89C480AD1D89F /* ResetAllDataService.swift */,
+				AAAAC0904838B6D1B66197EC /* SettingsDraft.swift */,
+				857DFAAE6EF601435BFA75EC /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		6529FAE4B4BDC244F7DC1E66 /* Packages */ = {
@@ -122,7 +197,9 @@
 		7B5BB8A68D49E46513D7B718 /* MomentumTests */ = {
 			isa = PBXGroup;
 			children = (
+				0201B8A930F6158543DD016A /* CSVExportServiceTests.swift */,
 				422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */,
+				97D5CFC5434D3E55A23F3368 /* SettingsPersistenceTests.swift */,
 			);
 			path = MomentumTests;
 			sourceTree = "<group>";
@@ -130,11 +207,30 @@
 		81F8B31EB610A749DEDF99C3 /* Persistence */ = {
 			isa = PBXGroup;
 			children = (
+				ED7DC642BB270ADDB827CB86 /* DailyReconciler.swift */,
 				9D090D983103C774D1A79F13 /* ModelContainerFactory.swift */,
 				E072B4895EE3EA2FDFA51B07 /* SchemaV1.swift */,
 				021AEB3CD665783BBE52CF25 /* SeedData.swift */,
 			);
 			path = Persistence;
+			sourceTree = "<group>";
+		};
+		96A9E983ED34A824185A5CEA /* Care */ = {
+			isa = PBXGroup;
+			children = (
+				48BECDF86FA4CE25EC2DAF01 /* CareRoutineSheet.swift */,
+			);
+			path = Care;
+			sourceTree = "<group>";
+		};
+		A22995A19C0933ED75B70773 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				18F44509934DE5411172A086 /* Assets.xcassets */,
+				039CBAB5362B83A6BE6B4FB5 /* Localizable.xcstrings */,
+				8AD9093FBD9C327C0E7849AF /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		BB0D944D14B4B35EAF1F9C1C /* DesignSystem */ = {
@@ -143,6 +239,14 @@
 				1B7316759B620D82328D71CB /* MomentumTheme.swift */,
 			);
 			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		BE2CB141560D9092840BEAC7 /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				4B01068415240D94B849EC4C /* CSVExportService.swift */,
+			);
+			path = Export;
 			sourceTree = "<group>";
 		};
 		C0B1A40F98D2A1EB1410C5A5 = {
@@ -163,6 +267,14 @@
 				3874E4291A3DB3650264F7E3 /* AppTab.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		E521080E132752EF19244874 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				D654CF1580796FD4CD4709E3 /* PersistedDomainDay.swift */,
+			);
+			path = Domain;
 			sourceTree = "<group>";
 		};
 		EA5D053652E058726BA65EED /* Today */ = {
@@ -233,6 +345,7 @@
 			buildConfigurationList = 0C9B509C4C7EEB799542B220 /* Build configuration list for PBXNativeTarget "Momentum" */;
 			buildPhases = (
 				856EAE00C142B111439F9AF9 /* Sources */,
+				DFFFB808399221B909903E6C /* Resources */,
 				74510E54451CB2FBBE4946AD /* Frameworks */,
 			);
 			buildRules = (
@@ -288,6 +401,19 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		DFFFB808399221B909903E6C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F185B7EAAD5307D658AA65B /* Assets.xcassets in Resources */,
+				F038DB4DB8348CA8F0B9C4FA /* Localizable.xcstrings in Resources */,
+				F98A9EE097DF2493C38490BF /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		7E8BA842713E3683C9BDB520 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -303,13 +429,24 @@
 			files = (
 				40198459694202BDD60F9E02 /* AppShell.swift in Sources */,
 				D23C4833E0D282C1A7673DE3 /* AppTab.swift in Sources */,
+				D5F1AF81B6FAEB989C0A62DD /* CSVExportService.swift in Sources */,
+				FF7E74730234AD02DC24E2B9 /* CareRoutineSheet.swift in Sources */,
+				5A31A87DED952CDCF2D242DD /* DailyReconciler.swift in Sources */,
+				3596142E93905367CE10A8C0 /* FoodEntrySheet.swift in Sources */,
 				72725C7A39900A6DBEE280EA /* ModelContainerFactory.swift in Sources */,
 				93CF080CC4587919A6C24D4D /* MomentumApp.swift in Sources */,
 				DE0CA459D5E3EE1256248969 /* MomentumTheme.swift in Sources */,
+				7D266F79539CB07F450A2D7A /* NotificationScheduler.swift in Sources */,
 				53ECA5F1D5F9B2DEAA0407B2 /* OnboardingView.swift in Sources */,
+				D0BE6409EB8003F1787A70B9 /* PersistedDomainDay.swift in Sources */,
+				B0D5FD18F9D2EEAC0CAA5777 /* ResetAllDataService.swift in Sources */,
 				8AAB50CFC88D10E3DE45A4E1 /* SchemaV1.swift in Sources */,
 				E3951258E29E40BC51AC2A2C /* SeedData.swift in Sources */,
+				B26D5216FD3F1AF5C2981CEE /* SettingsDraft.swift in Sources */,
+				765BCAB17AA5B99EE01D2019 /* SettingsView.swift in Sources */,
 				0C5205D600F7A38090084B6C /* TodayView.swift in Sources */,
+				274C09979A71031039C391AF /* WorkoutSessionStarter.swift in Sources */,
+				286524FF840404DCF6842C4D /* WorkoutSessionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -317,7 +454,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9380186BF062F43DEA685817 /* CSVExportServiceTests.swift in Sources */,
 				B214406AE014943969EDE500 /* MomentumAppTests.swift in Sources */,
+				EE3C431329745C7CF955BCE3 /* SettingsPersistenceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -341,6 +480,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -348,7 +488,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.pratham.MomentumTests;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Momentum.app/Momentum";
 			};
 			name = Debug;
@@ -496,6 +637,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -503,7 +645,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.pratham.MomentumUITests;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = Momentum;
 			};
 			name = Debug;
@@ -532,6 +675,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -539,7 +683,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.pratham.MomentumUITests;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = Momentum;
 			};
 			name = Release;
@@ -548,6 +693,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -555,7 +701,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.pratham.MomentumTests;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Momentum.app/Momentum";
 			};
 			name = Release;

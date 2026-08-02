@@ -231,6 +231,90 @@ final class ScheduleEngineTests: XCTestCase {
         )
     }
 
+    func test_archivedLatestCompletedTemplateUsesSessionSnapshots() {
+        let lowerAID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let upperBID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+        let lowerBID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
+        let completionDay = DomainDay(year: 2026, month: 8, day: 2)
+        let input = ScheduleInput(
+            activeWorkoutTemplates: [
+                WorkoutTemplate(id: lowerAID, name: "Lower A", sequenceIndex: 0, recoveryDaysAfter: 1),
+                WorkoutTemplate(id: upperBID, name: "Upper B", sequenceIndex: 1, recoveryDaysAfter: 0),
+                WorkoutTemplate(id: lowerBID, name: "Lower B", sequenceIndex: 2, recoveryDaysAfter: 2)
+            ],
+            cycleAnchor: CycleAnchor(
+                nextWorkoutID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+                firstDueDomainDay: completionDay
+            ),
+            completedSessions: [CompletedWorkoutSession(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
+                workoutTemplateID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+                completionDomainDay: completionDay,
+                finishedAt: Date(timeIntervalSince1970: 20),
+                sequenceIndexSnapshot: 0,
+                recoveryDaysAfterSnapshot: 0
+            )],
+            currentDomainDay: DomainDay(year: 2026, month: 8, day: 3)
+        )
+
+        XCTAssertEqual(ScheduleEngine().evaluate(input), .due(
+            workoutID: lowerAID,
+            dueDay: DomainDay(year: 2026, month: 8, day: 3),
+            overdueBy: 0
+        ))
+    }
+
+    func test_reorderedCycleUsesSnapshottedSuccessorWhenCompletedTemplateWasRemoved() {
+        let upperBID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+        let lowerBID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
+        let completionDay = DomainDay(year: 2026, month: 8, day: 2)
+        let input = ScheduleInput(
+            activeWorkoutTemplates: [
+                WorkoutTemplate(id: lowerBID, name: "Lower B", sequenceIndex: 0, recoveryDaysAfter: 2),
+                WorkoutTemplate(id: upperBID, name: "Upper B", sequenceIndex: 1, recoveryDaysAfter: 0)
+            ],
+            cycleAnchor: CycleAnchor(
+                nextWorkoutID: lowerBID,
+                firstDueDomainDay: completionDay
+            ),
+            completedSessions: [CompletedWorkoutSession(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
+                workoutTemplateID: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+                completionDomainDay: completionDay,
+                finishedAt: Date(timeIntervalSince1970: 20),
+                sequenceIndexSnapshot: 1,
+                recoveryDaysAfterSnapshot: 1,
+                nextWorkoutTemplateIDSnapshot: upperBID
+            )],
+            currentDomainDay: DomainDay(year: 2026, month: 8, day: 3)
+        )
+
+        XCTAssertEqual(ScheduleEngine().evaluate(input), .recovery(
+            nextWorkoutID: upperBID,
+            eligibleDay: DomainDay(year: 2026, month: 8, day: 4),
+            daysRemaining: 1
+        ))
+    }
+
+    func test_missingLatestTemplateWithoutRequiredSnapshotsStillNeedsRepair() {
+        var input = makeInput(
+            completedWorkoutID: UUID(uuidString: "00000000-0000-0000-0000-000000000099")!,
+            currentDay: DomainDay(year: 2026, month: 8, day: 3),
+            finishedAt: 20
+        )
+        input = ScheduleInput(
+            activeWorkoutTemplates: input.activeWorkoutTemplates,
+            cycleAnchor: input.cycleAnchor,
+            completedSessions: input.completedSessions,
+            currentDomainDay: input.currentDomainDay
+        )
+
+        XCTAssertEqual(
+            ScheduleEngine().evaluate(input),
+            .needsRepair(reason: .completedSessionReferencesMissingWorkout)
+        )
+    }
+
     private func makeInput(
         completedWorkoutID: UUID,
         currentDay: DomainDay,

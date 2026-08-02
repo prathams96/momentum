@@ -3,7 +3,7 @@ import MomentumCore
 import SwiftData
 
 enum SeedData {
-    static let currentVersion = 1
+    static let currentVersion = 3
 
     static func install(
         in context: ModelContext,
@@ -17,7 +17,13 @@ enum SeedData {
             .sorted { $0.updatedAt > $1.updatedAt }
             .first
 
+        let existingTargets = try context.fetch(FetchDescriptor<NutritionTargetRecord>())
+        if existingTargets.isEmpty {
+            context.insert(NutritionTargetRecord(effectiveFrom: encode(currentDomainDay)))
+        }
+
         if let settings, settings.seedVersion >= currentVersion {
+            try context.save()
             return
         }
 
@@ -26,27 +32,40 @@ enum SeedData {
             context.insert(settingsRecord)
         }
 
-        let workouts = seedWorkouts()
-        for workout in workouts {
-            context.insert(workout.record)
-            for exercise in workout.exercises {
-                context.insert(exercise.record(workoutID: workout.record.id))
-                for alternative in exercise.alternatives {
-                    context.insert(alternative.record(prescriptionID: exercise.id))
+        if settingsRecord.seedVersion < 1 {
+            let workouts = seedWorkouts()
+            for workout in workouts {
+                context.insert(workout.record)
+                for exercise in workout.exercises {
+                    context.insert(exercise.record(workoutID: workout.record.id))
+                    for alternative in exercise.alternatives {
+                        context.insert(alternative.record(prescriptionID: exercise.id))
+                    }
+                }
+            }
+
+            let upperA = workouts[0].record
+            context.insert(CycleAnchorRecord(
+                nextWorkoutTemplateID: upperA.id,
+                firstDueDomainDay: encode(currentDomainDay)
+            ))
+
+            for routine in seedCareRoutines(currentDomainDay: currentDomainDay) {
+                context.insert(routine.record)
+                for task in routine.tasks {
+                    context.insert(task.record(routineID: routine.record.id))
                 }
             }
         }
 
-        let upperA = workouts[0].record
-        context.insert(CycleAnchorRecord(
-            nextWorkoutTemplateID: upperA.id,
-            firstDueDomainDay: encode(currentDomainDay)
-        ))
-
-        for routine in seedCareRoutines() {
-            context.insert(routine.record)
-            for task in routine.tasks {
-                context.insert(task.record(routineID: routine.record.id))
+        if settingsRecord.seedVersion < 3 {
+            let routines = try context.fetch(FetchDescriptor<CareRoutineTemplateRecord>())
+            for routine in routines where !routine.isArchived {
+                routine.recurrencePayload = versionedPayload(
+                    for: routine.name,
+                    currentDomainDay: currentDomainDay
+                )
+                routine.updatedAt = .now
             }
         }
 
@@ -71,6 +90,7 @@ enum SeedData {
         let sets: Int
         let minimum: Int
         let maximum: Int
+        let unit: String
         let notes: String
         let increment: Double
         let optional: Bool
@@ -85,6 +105,7 @@ enum SeedData {
                 workingSetCount: sets,
                 repMinimum: minimum,
                 repMaximum: maximum,
+                repUnitRaw: unit,
                 notes: notes,
                 loadIncrementKg: increment,
                 isOptional: optional
@@ -142,7 +163,7 @@ enum SeedData {
                 exercise("Leg Curl", sets: 3, reps: 8...15, notes: "Seated or lying"),
                 exercise("Leg Extension or Leg Press", sets: 2, reps: 10...15, notes: "Choose one"),
                 exercise("Calf Raise", sets: 3, reps: 10...20, notes: "Full range of motion"),
-                exercise("Side Plank or Pallof Press", sets: 3, reps: 8...15, notes: "Choose one", alternatives: ["Pallof Press"])
+                exercise("Side Plank or Pallof Press", sets: 3, reps: 20...45, unit: "seconds", notes: "Side plank: hold for seconds. Pallof press: use reps.", alternatives: ["Pallof Press"])
             ])
         ]
     }
@@ -168,6 +189,7 @@ enum SeedData {
                     sets: exercise.sets,
                     minimum: exercise.minimum,
                     maximum: exercise.maximum,
+                    unit: exercise.unit,
                     notes: exercise.notes,
                     increment: exercise.increment,
                     optional: exercise.optional,
@@ -185,6 +207,7 @@ enum SeedData {
         _ name: String,
         sets: Int,
         reps: ClosedRange<Int>,
+        unit: String = "reps",
         notes: String,
         alternatives: [String] = [],
         optional: Bool = false
@@ -196,6 +219,7 @@ enum SeedData {
             sets: sets,
             minimum: reps.lowerBound,
             maximum: reps.upperBound,
+            unit: unit,
             notes: notes,
             increment: 1,
             optional: optional,
@@ -231,30 +255,30 @@ enum SeedData {
         }
     }
 
-    private static func seedCareRoutines() -> [SeedRoutine] {
+    private static func seedCareRoutines(currentDomainDay: DomainDay) -> [SeedRoutine] {
         [
-            routine("Morning care", payload: "weekdays:0,1,2,3,4,5,6", minutes: 540, tasks: [
+            routine("Morning care", payload: weekdayPayload(Set(1...7)), minutes: 540, tasks: [
                 task("Choose oily cleanse path", active: "salicylic acid", requirement: "conditionalChoice", condition: "morning-cleanse"),
                 task("Choose normal/dry cleanse path", role: "water rinse", requirement: "conditionalChoice", condition: "morning-cleanse"),
                 task("Apply moisturizer", role: "moisturizer", instruction: "Thin layer. Wait 30–60 seconds before sunscreen."),
                 task("Apply SPF 50 sunscreen", role: "sunscreen")
             ]),
-            routine("Night care — adapalene", payload: "weekdays:1,4", minutes: 1320, tasks: [
+            routine("Night care — adapalene", payload: weekdayPayload([2, 5]), minutes: 1320, tasks: [
                 task("Cleanse face", active: "salicylic acid"),
                 task("Pat dry", instruction: "Wait 10–20 minutes."),
                 task("Apply adapalene 0.1%", active: "adapalene 0.1%", instruction: "Pea-sized amount over the face. Wait 2–5 minutes."),
                 task("Apply moisturizer", role: "moisturizer")
             ]),
-            routine("Night care — azelaic acid", payload: "weekdays:3,6", minutes: 1320, tasks: [
+            routine("Night care — azelaic acid", payload: weekdayPayload([4, 7]), minutes: 1320, tasks: [
                 task("Cleanse face", active: "salicylic acid"),
                 task("Apply azelaic acid", active: "azelaic acid", instruction: "Pea-sized amount. Wait 1–2 minutes."),
                 task("Apply moisturizer", role: "moisturizer")
             ]),
-            routine("Night care", payload: "weekdays:0,2,5", minutes: 1320, tasks: [
+            routine("Night care", payload: weekdayPayload([1, 3, 6]), minutes: 1320, tasks: [
                 task("Cleanse face", active: "salicylic acid"),
                 task("Apply moisturizer", role: "moisturizer")
             ]),
-            routine("Hair care", kind: "alternatingInterval", payload: "intervals:3,4;seed:Wednesday,Saturday", minutes: 480, rolls: true, tasks: [
+            routine("Hair care", kind: "alternatingInterval", payload: alternatingPayload(anchor: nextHairCareDay(after: currentDomainDay)), minutes: 480, rolls: true, tasks: [
                 task("Wash scalp", active: "salicylic acid", instruction: "Massage gently for 1–2 minutes, then rinse thoroughly."),
                 task("Apply conditioner to hair lengths", role: "conditioner", instruction: "Avoid the scalp. Rinse after 2–3 minutes.")
             ])
@@ -289,6 +313,46 @@ enum SeedData {
                 )
             }
         )
+    }
+
+    private static func weekdayPayload(_ weekdays: Set<Int>) -> String {
+        encode(CareRecurrencePayload(rule: .weekdays(weekdays)))
+    }
+
+    private static func alternatingPayload(anchor: DomainDay) -> String {
+        encode(CareRecurrencePayload(rule: .alternating(
+            anchorDueDay: anchor,
+            intervals: [3, 4],
+            intervalAfterAnchorIndex: 0
+        )))
+    }
+
+    private static func versionedPayload(for name: String, currentDomainDay: DomainDay) -> String {
+        switch name {
+        case "Morning care": return weekdayPayload(Set(1...7))
+        case "Night care — adapalene": return weekdayPayload([2, 5])
+        case "Night care — azelaic acid": return weekdayPayload([4, 7])
+        case "Night care": return weekdayPayload([1, 3, 6])
+        case "Hair care": return alternatingPayload(anchor: nextHairCareDay(after: currentDomainDay))
+        default: return weekdayPayload([])
+        }
+    }
+
+    private static func encode(_ payload: CareRecurrencePayload) -> String {
+        let data = try? JSONEncoder().encode(payload)
+        return data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    private static func nextHairCareDay(after day: DomainDay) -> DomainDay {
+        let calendar = Calendar.autoupdatingCurrent
+        for offset in 0...6 {
+            let candidate = day.adding(days: offset, calendar: calendar)
+            guard let date = PersistedDomainDay.date(for: candidate, calendar: calendar) else { continue }
+            if [4, 7].contains(calendar.component(.weekday, from: date)) {
+                return candidate
+            }
+        }
+        return day
     }
 
     private static func task(
