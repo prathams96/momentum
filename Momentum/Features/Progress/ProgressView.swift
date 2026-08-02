@@ -17,6 +17,7 @@ struct ProgressTabView: View {
     @Query private var workoutEvents: [WorkoutDayEventRecord]
     @Query private var careOccurrences: [CareOccurrenceRecord]
     @Query private var settingsRecords: [AppSettingsRecord]
+    @Query private var milestones: [MilestoneRecord]
 
     @State private var presentedSheet: ProgressSheet?
     @State private var selectedPrescriptionID: UUID?
@@ -45,9 +46,24 @@ struct ProgressTabView: View {
         let id = selectedPrescriptionID ?? projection.exerciseSummaries.first?.prescriptionID
         return projection.exerciseSummaries.first { $0.prescriptionID == id }
     }
+    private var pendingMilestone: MilestoneRecord? {
+        MilestoneService.nextUnacknowledged(in: milestones)
+    }
+    private var milestoneSourceVersion: String {
+        [
+            "sessions:\(sessions.count):\(sessions.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
+            "logs:\(exerciseLogs.count):\(exerciseLogs.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
+            "sets:\(setLogs.count):\(setLogs.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
+            "events:\(workoutEvents.count):\(workoutEvents.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
+            "nutrition:\(nutritionDays.count):\(nutritionDays.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
+            "food:\(foodEntries.count):\(foodEntries.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
+            "care:\(careOccurrences.count):\(careOccurrences.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)"
+        ].joined(separator: "|")
+    }
 
     var body: some View {
         List {
+            milestoneSection
             measurementSection
             nutritionSection
             exerciseSection
@@ -55,6 +71,10 @@ struct ProgressTabView: View {
             suggestionSection
         }
         .navigationTitle("Progress")
+        .task(id: milestoneSourceVersion) {
+            do { try MilestoneService.reconcile(in: modelContext) }
+            catch { actionError = "Milestones could not be refreshed. Your activity is still safe." }
+        }
         .onAppear {
             if selectedPrescriptionID == nil {
                 selectedPrescriptionID = projection.exerciseSummaries.first?.prescriptionID
@@ -70,6 +90,28 @@ struct ProgressTabView: View {
         .alert("Couldn’t update progress", isPresented: Binding(
             get: { actionError != nil }, set: { if !$0 { actionError = nil } }
         )) { Button("OK", role: .cancel) {} } message: { Text(actionError ?? "Try again.") }
+    }
+
+    @ViewBuilder
+    private var milestoneSection: some View {
+        if let pendingMilestone {
+            let presentation = MilestoneService.presentation(
+                for: pendingMilestone,
+                prescriptions: prescriptions
+            )
+            Section("Milestone") {
+                VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
+                    Label(presentation.title, systemImage: presentation.symbol)
+                        .font(.headline)
+                        .foregroundStyle(MomentumTheme.pulseDeep)
+                    Text(presentation.message)
+                        .foregroundStyle(.secondary)
+                    Button("Noted") { acknowledge(pendingMilestone) }
+                        .buttonStyle(.bordered)
+                }
+                .accessibilityElement(children: .contain)
+            }
+        }
     }
 
     private var measurementSection: some View {
@@ -334,6 +376,11 @@ struct ProgressTabView: View {
     private func dismissSuggestion(_ suggestion: LoadSuggestionRecord) {
         do { try LoadSuggestionService.dismiss(suggestion, in: modelContext) }
         catch { actionError = "The suggestion was not dismissed." }
+    }
+
+    private func acknowledge(_ milestone: MilestoneRecord) {
+        do { try MilestoneService.acknowledge(milestone, in: modelContext) }
+        catch { actionError = "The milestone acknowledgement was not saved." }
     }
 
     private func displayedVolume(_ metricVolume: Double) -> Double {

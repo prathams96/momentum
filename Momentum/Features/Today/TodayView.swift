@@ -48,6 +48,7 @@ struct TodayView: View {
     @State private var reconciliationError: String?
     @State private var nutritionError: String?
     @State private var pendingEarlyStart: EarlyStartRequest?
+    @State private var pendingDuplicateSessionID: UUID?
 
     private let calendar = Calendar.autoupdatingCurrent
     @Binding private var notificationWorkoutRoute: WorkoutNotificationRoute?
@@ -100,7 +101,11 @@ struct TodayView: View {
     }
 
     private var adherenceFacts: [HistoryAdherenceFact] {
-        HistoryProjection.facts(
+        let interval = MomentumDiagnostics.signposter.beginInterval("TodayAggregation")
+        defer {
+            MomentumDiagnostics.signposter.endInterval("TodayAggregation", interval)
+        }
+        return HistoryProjection.facts(
             sessions: sessions,
             workoutEvents: workoutEvents,
             nutritionDays: nutritionDays,
@@ -113,7 +118,7 @@ struct TodayView: View {
     }
 
     var body: some View {
-        alertContent
+        repairConfirmationContent
     }
 
     private var mainContent: some View {
@@ -221,6 +226,23 @@ struct TodayView: View {
         }
     }
 
+    private var repairConfirmationContent: some View {
+        alertContent
+            .confirmationDialog(
+                "Keep this workout session?",
+                isPresented: Binding(
+                    get: { pendingDuplicateSessionID != nil },
+                    set: { if !$0 { pendingDuplicateSessionID = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Keep and resume") { resolveDuplicateSessions() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The other unfinished sessions will be closed as deleted history. Their set logs will not be merged into the session you keep.")
+            }
+    }
+
     private func handleEarlyStart(_ request: EarlyStartRequest) {
         guard let workout = workouts.first(where: { $0.id == request.workoutID }) else {
             startError = "That workout is no longer available in the current plan."
@@ -296,11 +318,15 @@ struct TodayView: View {
                     repairCard
                 }
             case let .needsRepair(reason):
-                ContentUnavailableView(
-                    "Your cycle needs attention",
-                    systemImage: "wrench.and.screwdriver",
-                    description: Text(reason.repairDescription)
-                )
+                if reason == .duplicateActiveSessions {
+                    duplicateSessionRepairCard
+                } else {
+                    ContentUnavailableView(
+                        "Your cycle needs attention",
+                        systemImage: "wrench.and.screwdriver",
+                        description: Text(reason.repairDescription)
+                    )
+                }
             }
         }
     }
@@ -371,6 +397,66 @@ struct TodayView: View {
             systemImage: "figure.strengthtraining.traditional",
             description: Text("Open Plans to choose the next workout in your cycle.")
         )
+    }
+
+    private var duplicateSessionRepairCard: some View {
+        VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+            Label("Choose the workout to keep", systemImage: "exclamationmark.triangle")
+                .font(.headline)
+                .foregroundStyle(MomentumTheme.warning)
+            Text("More than one unfinished session was found. Choose one to resume; the others will be closed without merging their logs.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            ForEach(openSessions.sorted { $0.startedAt > $1.startedAt }) { session in
+                Button {
+                    pendingDuplicateSessionID = session.id
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(session.workoutNameSnapshot)
+                                .font(.headline)
+                            Text("Started \(session.startedAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("Keep")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .padding(MomentumSpacing.sm)
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Keeps and resumes this session after confirmation")
+            }
+        }
+        .padding(MomentumSpacing.md)
+        .background(MomentumTheme.pulseWash)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func resolveDuplicateSessions() {
+        guard let selectedID = pendingDuplicateSessionID,
+              openSessions.contains(where: { $0.id == selectedID }) else {
+            pendingDuplicateSessionID = nil
+            return
+        }
+        do {
+            try WorkoutSessionRepairService.resolveDuplicateOpenSessions(
+                keeping: selectedID,
+                sessions: openSessions,
+                in: modelContext
+            )
+            pendingDuplicateSessionID = nil
+            presentedSessionID = selectedID
+            refreshReconciledState()
+        } catch {
+            modelContext.rollback()
+            pendingDuplicateSessionID = nil
+            startError = "The duplicate sessions could not be resolved. No session was closed."
+        }
     }
 
     private var activitySection: some View {
@@ -692,6 +778,36 @@ struct TodayView: View {
     private func formatted(_ day: DomainDay) -> String {
         PersistedDomainDay.date(for: day, calendar: calendar)?.formatted(.dateTime.month(.abbreviated).day()) ?? "that day"
     }
+}
+
+@MainActor
+enum WorkoutSessionRepairService {
+    static func resolveDuplicateOpenSessions(
+        keeping selectedID: UUID,
+        sessions: [WorkoutSessionRecord],
+        in context: ModelContext,
+        now: Date = .now
+    ) throws {
+        let open = sessions.filter { $0.finishedAt == nil && $0.deletedAt == nil }
+        guard open.count > 1,
+              open.contains(where: { $0.id == selectedID }) else {
+            throw WorkoutSessionRepairError.invalidSelection
+        }
+        for session in open where session.id != selectedID {
+            session.deletedAt = now
+            session.updatedAt = now
+        }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+}
+
+enum WorkoutSessionRepairError: Error {
+    case invalidSelection
 }
 
 private extension ScheduleRepairReason {

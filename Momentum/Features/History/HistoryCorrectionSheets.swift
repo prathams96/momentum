@@ -4,11 +4,13 @@ import SwiftUI
 
 enum HistorySheetDestination: Identifiable {
     case editFood(id: UUID, domainDay: String)
+    case editWorkoutCompletion(id: UUID, currentCompletion: Date)
     case backdate(HistoryBackdateTarget)
 
     var id: String {
         switch self {
         case let .editFood(id, _): "edit-food-\(id.uuidString)"
+        case let .editWorkoutCompletion(id, _): "edit-workout-\(id.uuidString)"
         case let .backdate(target): "backdate-\(target.id)"
         }
     }
@@ -66,6 +68,13 @@ enum HistoryDeletionRequest: Identifiable {
             return "Workout order, recovery, adherence, and progression may change. Before: \(preview.beforeSummary). After: \(preview.afterSummary). You can undo this deletion while History remains open."
         }
     }
+}
+
+struct HistoryCareUndoRequest: Identifiable {
+    let occurrenceID: UUID
+    let routineName: String
+
+    var id: UUID { occurrenceID }
 }
 
 struct HistoryBackdateSheet: View {

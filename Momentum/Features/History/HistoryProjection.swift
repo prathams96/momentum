@@ -78,6 +78,11 @@ enum HistoryProjection {
         calendar: Calendar,
         weekCount: Int = 16
     ) -> [DomainDay] {
+        let interval = MomentumDiagnostics.signposter.beginInterval("HeatmapComputation")
+        defer {
+            MomentumDiagnostics.signposter.endInterval("HeatmapComputation", interval)
+        }
+
         guard weekCount > 0,
               let date = PersistedDomainDay.date(for: day, calendar: calendar) else {
             return []

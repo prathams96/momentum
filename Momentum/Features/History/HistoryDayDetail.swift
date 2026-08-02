@@ -18,6 +18,9 @@ struct HistoryDayDetail: View {
     let requestFoodDeletion: (FoodEntryRecord) -> Void
     let requestMeasurementDeletion: (BodyMeasurementRecord) -> Void
     let requestWorkoutDeletion: (WorkoutSessionRecord) -> Void
+    let editWorkoutCompletion: (WorkoutSessionRecord) -> Void
+    let toggleNutritionFinalization: (DomainDay) -> Void
+    let requestCareCompletionUndo: (CareOccurrenceRecord) -> Void
 
     private var dayKey: String { PersistedDomainDay.encode(day) }
     private var unitSystem: UnitSystemOption {
@@ -100,6 +103,14 @@ struct HistoryDayDetail: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
+                .swipeActions(edge: .leading) {
+                    if session.finishedAt != nil {
+                        Button("Edit time") {
+                            editWorkoutCompletion(session)
+                        }
+                        .tint(MomentumTheme.pulse)
+                    }
+                }
                 .swipeActions {
                     if session.finishedAt != nil {
                         Button("Delete", role: .destructive) {
@@ -109,6 +120,9 @@ struct HistoryDayDetail: View {
                 }
                 .contextMenu {
                     if session.finishedAt != nil {
+                        Button("Edit completion time") {
+                            editWorkoutCompletion(session)
+                        }
                         Button("Delete workout", role: .destructive) {
                             requestWorkoutDeletion(session)
                         }
@@ -144,9 +158,17 @@ struct HistoryDayDetail: View {
                     "Target",
                     value: "\(record.calorieMinimumSnapshot)–\(record.calorieMaximumSnapshot) kcal · \(record.proteinMinimumSnapshot) g protein"
                 )
+
+                Button(record.finalizedAt == nil ? "Finalize logging" : "Reopen logging") {
+                    toggleNutritionFinalization(day)
+                }
             } else if dayFoods.isEmpty {
                 Text("No nutrition facts")
                     .foregroundStyle(.secondary)
+            } else {
+                Button("Finalize logging") {
+                    toggleNutritionFinalization(day)
+                }
             }
 
             ForEach(dayFoods) { entry in
@@ -210,8 +232,21 @@ struct HistoryDayDetail: View {
                         .foregroundStyle(
                             occurrence.statusRaw == "completed" ? MomentumTheme.success : .secondary
                         )
+                    if occurrence.statusRaw == "completed" {
+                        Button("Undo") {
+                            requestCareCompletionUndo(occurrence)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Undo \(occurrence.routineNameSnapshot) completion")
+                    }
                 }
-                .accessibilityElement(children: .combine)
+                .contextMenu {
+                    if occurrence.statusRaw == "completed" {
+                        Button("Undo completion") {
+                            requestCareCompletionUndo(occurrence)
+                        }
+                    }
+                }
             }
         }
     }

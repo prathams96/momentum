@@ -62,6 +62,10 @@ The branch is not yet release-certified. Remaining product work is concentrated 
 - Completed-workout deletion preview shows the before/after next workout and due day without mutating first.
 - Accepted corrections reconcile adherence, schedule, and reminders.
 - History measurement values respect the selected unit system.
+- Completed workout timestamps can be edited/backdated after a non-mutating before/after schedule preview; logged sets remain explicitly unchanged.
+- Past Nutrition Days can be finalized or reopened directly from History.
+- Completed care can be undone directly from History, including alternating-recurrence rollback.
+- Correction mutations run through transaction-focused services and tests.
 
 ### Plans
 
@@ -86,6 +90,8 @@ The branch is not yet release-certified. Remaining product work is concentrated 
 - Load suggestions support Use, Edit, and Dismiss; accepted weight becomes the prescription working weight.
 - Metric/imperial input, display, chart, summary, and accessibility values are consistent.
 - No estimated one-repetition maximum is calculated.
+- Milestones are generated idempotently for workout thresholds, category-streak records, exercise bests, and consecutive in-range nutrition days.
+- Progress presents one calm, persistently acknowledged milestone at a time.
 
 ### Settings, reset, and release assets
 
@@ -98,21 +104,24 @@ The branch is not yet release-certified. Remaining product work is concentrated 
 - Preview/local development stores explicitly disable CloudKit.
 - A 1024×1024 App Store icon is included in the asset catalog.
 - New History sources and tests are included in the generated Xcode project.
+- Cloud account changes and foreground activation refresh a truthful account-availability state without claiming an unobserved successful sync.
+- Material time-zone changes are detected separately, require accept/defer confirmation, and leave logging available while reconciliation is deferred.
+- Duplicate unfinished Workout Sessions have an explicit choose-one resolver; nonselected sessions are soft-deleted without merging logs.
+- OSLog signposts cover Today aggregation, reconciliation, heatmap computation, and Cloud account-state processing.
 
 ## Remaining implementation gaps
 
-### GAP-R1 — CloudKit state, conflict resolution, and production verification
+### GAP-R1 — CloudKit import evidence, schema promotion, and production verification
 
 **Priority:** P0 before release
-**Current state:** Production uses a private CloudKit-backed SwiftData configuration and has the required entitlements, but end-to-end behavior is not certified.
+**Current state:** Production uses a private CloudKit-backed SwiftData configuration and has the required entitlements. Account availability is refreshed truthfully, duplicate local/imported singletons and occurrences are repaired deterministically, and duplicate active sessions have user-resolution UI. End-to-end import/export behavior is not certified.
 
 Required work:
 
-- Add a persistent CloudKit/account/import observer that truthfully updates `Syncing`, `Synced recently`, `iCloud unavailable`, and `Local only`.
+- Add an import/export completion signal before ever transitioning from `Syncing` to `Synced recently`; account availability alone intentionally remains `Syncing`.
 - Initialize and inspect the development schema, then promote the intended production schema.
 - Verify create/edit/delete sync between two signed installations using the same Apple ID.
 - Verify offline writes followed by reconnect, including reset deletions.
-- Add an in-app resolver for duplicate unfinished Workout Sessions. Today currently explains the repair condition but does not let the Routine Owner choose which session to retain.
 - Add deterministic repair/reporting for impossible imported cycle orders and other multi-record conflicts.
 - Add migration coverage from every schema shipped to users.
 
@@ -123,52 +132,23 @@ Acceptance evidence:
 - CloudKit schema screenshots or exported schema record;
 - automated duplicate-singleton/occurrence/event and migration tests.
 
-### GAP-R2 — Complete advanced History mutations
-
-**Priority:** P1
-**Current state:** Delete preview/undo, food edit/backdate, and measurement backdate are implemented.
-
-Required work:
-
-- Add completed Workout Session timestamp/backdate editing with the same before/after schedule preview used for deletion.
-- Add direct History actions for reopening/finalizing past Nutrition Days where allowed.
-- Add direct History care correction entry points, including completed-routine undo, rather than requiring the Today sheet.
-- Decide and implement whether historical set-level edits are supported; if not, explicitly constrain the UI/spec to session timestamp/delete corrections.
-- Add transaction tests proving each correction recalculates schedule, totals, adherence, streaks, and reminders atomically.
-
-### GAP-R3 — Milestone acknowledgements
-
-**Priority:** P1
-**Current state:** `MilestoneRecord` exists, but milestone generation/presentation is not implemented.
-
-Required work:
-
-- Idempotently generate the 10, 25, and 50 completed-workout milestones.
-- Generate restrained new-record acknowledgements for category streaks, exercise bests, and consecutive days in the nutrition target range.
-- Present one calm acknowledgement at a time and persist dismissal/acknowledgement.
-- Never use coins, levels, confetti, streak freezes, or punitive copy.
-- Add threshold, idempotency, correction, and deletion regression tests.
-
-### GAP-R4 — Time-zone attribution confirmation
-
-**Priority:** P1
-**Current state:** Significant time changes trigger reconciliation and cutoff edits have a preview/confirmation.
-
-Required work:
-
-- Detect a material time-zone change separately from an ordinary clock change.
-- Preview concrete recent Domain Day attribution changes before rewriting affected derived facts where practical.
-- Let the user accept or defer the attribution change without blocking local logging.
-- Add eastbound/westbound and daylight-saving transition tests.
-
-### GAP-R5 — Diagnostics and performance instrumentation
+### GAP-R2 — Enrich time-zone attribution preview
 
 **Priority:** P2
-**Current state:** Views use lazy containers where the spec calls for them, but the required signpost evidence is absent.
+**Current state:** Material time-zone changes are persisted, distinguished from ordinary activation, and require accept/defer confirmation. Reconciliation remains deferred after Later while logging stays available.
 
 Required work:
 
-- Add OSLog signposts around Today aggregation, daily reconciliation, heatmap computation, and CloudKit-import processing.
+- Enrich the confirmation with concrete recent Domain Days whose attribution would change, rather than only old/new time-zone names.
+- Add explicit eastbound/westbound and daylight-saving acceptance fixtures beyond the current decision-policy tests.
+
+### GAP-R3 — Physical performance evidence
+
+**Priority:** P2
+**Current state:** Views use lazy containers and the required diagnostic signposts are present. Physical measurements are absent.
+
+Required work:
+
 - Profile Today, Workout Session, and 52-week History scrolling on the physical target class.
 - Confirm launch, memory, and scrolling budgets with a production-sized fixture.
 
@@ -186,16 +166,15 @@ These tasks require external infrastructure, a physical device, or manual inspec
 ## Automated verification at this checkpoint
 
 - `swift test`: **53 passed, 0 failed**.
-- iPhone 17 Pro Max simulator on iOS 26.4: **36 passed, 0 failed** across app unit and UI tests.
+- iPhone 17 Pro Max simulator on iOS 26.4: **52 passed, 0 failed** across app unit and UI tests.
 - Generic iOS Simulator app build: passed.
 - `git diff --check`: passed.
 
-The automated suite now covers long-gap misses, active-session cutoff behavior, deterministic duplicate repair, notification payload/coalescing, idempotent care completion, alternating recurrence, History projections/correction previews, effective-dated nutrition targets, measurement edit/delete, working-weight acceptance, appearance resolution, and same-day-aware seven-day averages.
+The automated suite now also covers History correction transactions, workout timestamp previews, milestone thresholds/idempotency/correction, Cloud account-state policy, time-zone change decisions, persistence store-mode selection, and duplicate-session resolution.
 
 ## Recommended next handoff order
 
 1. Complete GAP-R1 and capture real CloudKit evidence.
-2. Complete GAP-R2 and GAP-R3 with transaction-level tests.
-3. Add time-zone confirmation in GAP-R4.
-4. Run diagnostics and the full manual/device release matrix.
-5. Archive, sign, and perform the final App Store preflight.
+2. Enrich and fixture-test the time-zone attribution preview in GAP-R2.
+3. Capture physical performance evidence and run the full manual/device release matrix.
+4. Archive, sign, and perform the final App Store preflight.

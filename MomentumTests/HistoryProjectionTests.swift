@@ -137,5 +137,32 @@ final class HistoryProjectionTests: XCTestCase {
         XCTAssertEqual(preview.beforeSummary, "Upper A · due 2026-08-04")
         XCTAssertEqual(preview.afterSummary, "Lower A · due 2026-08-02")
         XCTAssertNil(sessions.last?.deletedAt)
+
+        let timestampPreview = try XCTUnwrap(
+            HistoryCorrectionProjection.workoutCompletionPreview(
+                sessionID: targetID,
+                proposedFinishedAt: calendar.date(from: DateComponents(
+                    year: 2026,
+                    month: 8,
+                    day: 4,
+                    hour: 11
+                ))!,
+                workouts: workouts,
+                anchors: anchors,
+                sessions: sessions,
+                settings: [AppSettingsRecord(domainDayCutoffMinutes: 180)],
+                now: calendar.date(from: DateComponents(
+                    year: 2026,
+                    month: 8,
+                    day: 3,
+                    hour: 12
+                ))!,
+                calendar: calendar
+            )
+        )
+        XCTAssertEqual(timestampPreview.beforeSummary, "Upper A · due 2026-08-04")
+        XCTAssertEqual(timestampPreview.afterSummary, "Upper A · due 2026-08-06")
+        XCTAssertEqual(sessions.last?.completionDomainDay, "2026-08-02")
+        XCTAssertEqual(sessions.last?.finishedAt, Date(timeIntervalSince1970: 40))
     }
 }

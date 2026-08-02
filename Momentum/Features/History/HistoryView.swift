@@ -20,6 +20,7 @@ struct HistoryView: View {
     @State private var presentedSheet: HistorySheetDestination?
     @State private var pendingDeletion: HistoryDeletionRequest?
     @State private var lastDeletion: HistoryDeletionRequest?
+    @State private var pendingCareUndo: HistoryCareUndoRequest?
     @State private var correctionError: String?
 
     private let calendar = Calendar.autoupdatingCurrent
@@ -161,7 +162,21 @@ struct HistoryView: View {
                 },
                 requestFoodDeletion: { pendingDeletion = .food(id: $0.id) },
                 requestMeasurementDeletion: { pendingDeletion = .measurement(id: $0.id) },
-                requestWorkoutDeletion: requestWorkoutDeletion
+                requestWorkoutDeletion: requestWorkoutDeletion,
+                editWorkoutCompletion: { session in
+                    guard let finishedAt = session.finishedAt else { return }
+                    presentedSheet = .editWorkoutCompletion(
+                        id: session.id,
+                        currentCompletion: finishedAt
+                    )
+                },
+                toggleNutritionFinalization: toggleNutritionFinalization,
+                requestCareCompletionUndo: { occurrence in
+                    pendingCareUndo = HistoryCareUndoRequest(
+                        occurrenceID: occurrence.id,
+                        routineName: occurrence.routineNameSnapshot
+                    )
+                }
             )
         }
         .toolbar {
@@ -176,6 +191,11 @@ struct HistoryView: View {
             switch destination {
             case let .editFood(id, domainDay):
                 FoodEntrySheet(domainDay: domainDay, existingEntryID: id)
+            case let .editWorkoutCompletion(id, currentCompletion):
+                HistoryWorkoutCompletionSheet(
+                    sessionID: id,
+                    currentCompletion: currentCompletion
+                )
             case let .backdate(target):
                 HistoryBackdateSheet(target: target)
             }
@@ -195,6 +215,22 @@ struct HistoryView: View {
             Button("Cancel", role: .cancel) {}
         } message: { deletion in
             Text(deletion.message)
+        }
+        .confirmationDialog(
+            "Undo care completion?",
+            isPresented: Binding(
+                get: { pendingCareUndo != nil },
+                set: { if !$0 { pendingCareUndo = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingCareUndo
+        ) { request in
+            Button("Undo completion") {
+                undoCareCompletion(request)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { request in
+            Text("\(request.routineName), its tasks, recurrence, adherence, streaks, and reminders will be recalculated.")
         }
         .alert("History couldn’t be refreshed", isPresented: Binding(
             get: { correctionError != nil },
@@ -248,6 +284,33 @@ struct HistoryView: View {
             reconcileHistory()
         } catch {
             correctionError = "The record is still visible because the deletion could not be saved."
+        }
+    }
+
+    private func toggleNutritionFinalization(_ day: DomainDay) {
+        do {
+            try HistoryCorrectionService.toggleNutritionFinalization(
+                domainDay: day,
+                in: modelContext,
+                calendar: calendar
+            )
+            reconcileHistory()
+        } catch {
+            correctionError = "Nutrition logging could not be changed. No partial correction was kept."
+        }
+    }
+
+    private func undoCareCompletion(_ request: HistoryCareUndoRequest) {
+        do {
+            try HistoryCorrectionService.undoCareCompletion(
+                occurrenceID: request.occurrenceID,
+                in: modelContext,
+                calendar: calendar
+            )
+            pendingCareUndo = nil
+            reconcileHistory()
+        } catch {
+            correctionError = "Care completion could not be undone. No partial correction was kept."
         }
     }
 

@@ -5,6 +5,21 @@ enum PersistenceStoreMode: Equatable {
     case production
     case localDevelopment
     case preview
+
+    static func current(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Self {
+        if environment["XCTestConfigurationFilePath"] != nil || arguments.contains("-usePreviewStore") {
+            return .preview
+        }
+
+        #if targetEnvironment(simulator)
+        return .localDevelopment
+        #else
+        return .production
+        #endif
+    }
 }
 
 enum ModelContainerFactory {

@@ -28,7 +28,7 @@ private enum PersistenceBootstrap {
 
     init() {
         do {
-            let container = try Self.makeContainer(for: Self.storeMode())
+            let container = try Self.makeContainer(for: PersistenceStoreMode.current())
             try SeedData.install(in: container.mainContext)
             self = .ready(container)
         } catch {
@@ -47,19 +47,6 @@ private enum PersistenceBootstrap {
         }
     }
 
-    private static func storeMode() -> PersistenceStoreMode {
-        let arguments = ProcessInfo.processInfo.arguments
-        let environment = ProcessInfo.processInfo.environment
-        if environment["XCTestConfigurationFilePath"] != nil || arguments.contains("-usePreviewStore") {
-            return .preview
-        }
-
-        #if targetEnvironment(simulator)
-        return .localDevelopment
-        #else
-        return .production
-        #endif
-    }
 }
 
 private struct PersistenceUnavailableView: View {

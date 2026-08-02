@@ -617,4 +617,32 @@ final class MomentumAppTests: XCTestCase {
         try NutritionDayService.reopen(existing: finalized, context: context)
         XCTAssertNil(finalized.finalizedAt)
     }
+
+    func testDuplicateSessionRepairKeepsSelectedSessionAndSoftDeletesOthers() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let kept = WorkoutSessionRecord(
+            workoutNameSnapshot: "Upper A",
+            scheduledDomainDay: "2026-08-02"
+        )
+        let closed = WorkoutSessionRecord(
+            workoutNameSnapshot: "Lower A",
+            scheduledDomainDay: "2026-08-02"
+        )
+        context.insert(kept)
+        context.insert(closed)
+        try context.save()
+
+        let resolvedAt = Date(timeIntervalSince1970: 500)
+        try WorkoutSessionRepairService.resolveDuplicateOpenSessions(
+            keeping: kept.id,
+            sessions: [closed, kept],
+            in: context,
+            now: resolvedAt
+        )
+
+        XCTAssertNil(kept.deletedAt)
+        XCTAssertEqual(closed.deletedAt, resolvedAt)
+        XCTAssertEqual(closed.updatedAt, resolvedAt)
+    }
 }

@@ -220,8 +220,8 @@ struct SettingsView: View {
     private var iCloudStatusTitle: String {
         guard let settings else { return "Local only" }
         switch settings.iCloudStatusRaw {
-        case "syncing": return "Syncing"
-        case "synced", "available": return "Synced recently"
+        case "syncing", "available": return "Syncing"
+        case "synced": return "Synced recently"
         case "unavailable", "noAccount", "restricted": return "iCloud unavailable"
         case "localOnly": return "Local only"
         default: return settings.lastSuccessfulSyncAt == nil ? "Local only" : "Synced recently"
@@ -230,11 +230,19 @@ struct SettingsView: View {
 
     private var iCloudStatusDetail: String? {
         guard let settings else { return nil }
-        if let lastSuccessfulSyncAt = settings.lastSuccessfulSyncAt {
-            return "Last confirmed sync \(lastSuccessfulSyncAt.formatted(date: .abbreviated, time: .shortened))."
-        }
-        if settings.iCloudStatusRaw == "unavailable" {
+        switch settings.iCloudStatusRaw {
+        case "syncing", "available":
+            return "iCloud is available. Waiting for a confirmed sync event."
+        case "unavailable", "noAccount", "restricted":
             return "Your data remains available on this device."
+        case "localOnly":
+            return "This build stores data only on this device."
+        default:
+            break
+        }
+        if settings.iCloudStatusRaw == "synced",
+           let lastSuccessfulSyncAt = settings.lastSuccessfulSyncAt {
+            return "Last confirmed sync \(lastSuccessfulSyncAt.formatted(date: .abbreviated, time: .shortened))."
         }
         return nil
     }

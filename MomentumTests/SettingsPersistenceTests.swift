@@ -219,4 +219,74 @@ final class SettingsPersistenceTests: XCTestCase {
         XCTAssertEqual(AppSettingsRecord.canonical(in: [higher, lower])?.id, higher.id)
         XCTAssertEqual(AppSettingsRecord.canonical(in: [lower, higher])?.id, higher.id)
     }
+
+    func testCloudAccountAvailabilityDoesNotClaimSuccessfulSync() {
+        XCTAssertEqual(
+            CloudAccountStatePolicy.status(storeMode: .production, availability: .available),
+            "syncing"
+        )
+        XCTAssertEqual(
+            CloudAccountStatePolicy.status(storeMode: .production, availability: .noAccount),
+            "noAccount"
+        )
+        XCTAssertEqual(
+            CloudAccountStatePolicy.status(storeMode: .preview, availability: .available),
+            "localOnly"
+        )
+    }
+
+    func testTimeZoneDecisionInitializesWithoutPrompting() {
+        XCTAssertEqual(
+            MaterialTimeZoneChangeDecision.evaluate(
+                acceptedIdentifier: nil,
+                pendingIdentifier: nil,
+                currentIdentifier: "Asia/Kolkata"
+            ),
+            .initialize(identifier: "Asia/Kolkata")
+        )
+    }
+
+    func testTimeZoneDecisionTreatsDSTOffsetChangeAsNonMaterial() {
+        XCTAssertEqual(
+            MaterialTimeZoneChangeDecision.evaluate(
+                acceptedIdentifier: "America/New_York",
+                pendingIdentifier: nil,
+                currentIdentifier: "America/New_York"
+            ),
+            .unchanged(clearPending: false)
+        )
+    }
+
+    func testTimeZoneDecisionRequiresConfirmationForEastAndWestTravel() {
+        let eastbound = MaterialTimeZoneChangeDecision.evaluate(
+            acceptedIdentifier: "America/Los_Angeles",
+            pendingIdentifier: nil,
+            currentIdentifier: "Asia/Tokyo"
+        )
+        let westbound = MaterialTimeZoneChangeDecision.evaluate(
+            acceptedIdentifier: "Asia/Tokyo",
+            pendingIdentifier: nil,
+            currentIdentifier: "America/Los_Angeles"
+        )
+
+        XCTAssertEqual(eastbound, .requiresConfirmation(MaterialTimeZoneChange(
+            previousIdentifier: "America/Los_Angeles",
+            currentIdentifier: "Asia/Tokyo"
+        )))
+        XCTAssertEqual(westbound, .requiresConfirmation(MaterialTimeZoneChange(
+            previousIdentifier: "Asia/Tokyo",
+            currentIdentifier: "America/Los_Angeles"
+        )))
+    }
+
+    func testReturningToAcceptedTimeZoneClearsDeferredChange() {
+        XCTAssertEqual(
+            MaterialTimeZoneChangeDecision.evaluate(
+                acceptedIdentifier: "Europe/London",
+                pendingIdentifier: "Asia/Kolkata",
+                currentIdentifier: "Europe/London"
+            ),
+            .unchanged(clearPending: true)
+        )
+    }
 }

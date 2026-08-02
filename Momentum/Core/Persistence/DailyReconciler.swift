@@ -9,6 +9,11 @@ enum DailyReconciler {
         now: Date = .now,
         calendar: Calendar = .autoupdatingCurrent
     ) throws {
+        let interval = MomentumDiagnostics.signposter.beginInterval("DailyReconciliation")
+        defer {
+            MomentumDiagnostics.signposter.endInterval("DailyReconciliation", interval)
+        }
+
         let settings = AppSettingsRecord.canonical(
             in: try context.fetch(FetchDescriptor<AppSettingsRecord>())
         )

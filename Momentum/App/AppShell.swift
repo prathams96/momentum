@@ -1,3 +1,4 @@
+import CloudKit
 import SwiftUI
 import SwiftData
 import UIKit
@@ -7,6 +8,7 @@ struct AppShell: View {
     @State private var selectedTab: AppTab = .today
     @State private var notificationDelegate = MomentumNotificationDelegate()
     @State private var pendingWorkoutRoute: WorkoutNotificationRoute?
+    @State private var pendingTimeZoneChange: MaterialTimeZoneChange?
     @Query private var settings: [AppSettingsRecord]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -24,13 +26,35 @@ struct AppShell: View {
                     }
                     UNUserNotificationCenter.current().delegate = notificationDelegate
                     Task { await NotificationScheduler().configureCategories() }
-                    reconcile()
+                    refreshCloudAccountState()
+                    evaluateTimeZoneAndReconcile()
                 }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { reconcile() }
+                    guard phase == .active else { return }
+                    refreshCloudAccountState()
+                    evaluateTimeZoneAndReconcile()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
-                    reconcile()
+                    evaluateTimeZoneAndReconcile()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .CKAccountChanged)) { _ in
+                    refreshCloudAccountState()
+                }
+                .alert(
+                    "Time zone changed",
+                    isPresented: timeZoneAlertIsPresented,
+                    presenting: pendingTimeZoneChange
+                ) { change in
+                    Button("Use New Time Zone") {
+                        MaterialTimeZoneChangeStore.accept(change)
+                        pendingTimeZoneChange = nil
+                        reconcile()
+                    }
+                    Button("Later", role: .cancel) {
+                        pendingTimeZoneChange = nil
+                    }
+                } message: { change in
+                    Text(timeZoneChangeMessage(change))
                 }
         } else {
             OnboardingView()
@@ -86,5 +110,39 @@ struct AppShell: View {
         Task {
             try? await DailyReconciler.reconcileAndNotify(in: modelContext)
         }
+    }
+
+    private func refreshCloudAccountState() {
+        Task {
+            try? await CloudAccountStateService.refresh(in: modelContext)
+        }
+    }
+
+    private func evaluateTimeZoneAndReconcile() {
+        if let change = MaterialTimeZoneChangeStore.evaluate() {
+            pendingTimeZoneChange = change
+        } else {
+            pendingTimeZoneChange = nil
+            reconcile()
+        }
+    }
+
+    private var timeZoneAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { pendingTimeZoneChange != nil },
+            set: { isPresented in
+                if !isPresented { pendingTimeZoneChange = nil }
+            }
+        )
+    }
+
+    private func timeZoneChangeMessage(_ change: MaterialTimeZoneChange) -> String {
+        let previous = timeZoneName(change.previousIdentifier)
+        let current = timeZoneName(change.currentIdentifier)
+        return "Momentum detected a move from \(previous) to \(current). Original timestamps stay unchanged. Use the new time zone to resume day, streak, schedule, and reminder reconciliation. Choose Later to keep logging while reconciliation remains deferred."
+    }
+
+    private func timeZoneName(_ identifier: String) -> String {
+        TimeZone(identifier: identifier)?.localizedName(for: .generic, locale: .current) ?? identifier
     }
 }
