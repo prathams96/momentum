@@ -1,0 +1,46 @@
+name: Momentum
+
+options:
+  bundleIdPrefix: com.pratham
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  MomentumCore:
+    path: .
+
+targets:
+  Momentum:
+    type: application
+    platform: iOS
+    sources:
+      - path: Momentum
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pratham.momentum
+        INFOPLIST_FILE: Momentum/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Momentum/Momentum.entitlements
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - package: MomentumCore
+
+  MomentumTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MomentumTests
+    dependencies:
+      - target: Momentum
+
+  MomentumUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: MomentumUITests
+    dependencies:
+      - target: Momentum
