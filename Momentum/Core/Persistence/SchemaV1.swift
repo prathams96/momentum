@@ -233,6 +233,9 @@ final class WorkoutSessionRecord {
     var completionDomainDay: String?
     var startedEarly: Bool = false
     var note: String = ""
+    var postWorkoutEnergyRaw: String?
+    var postWorkoutSorenessRaw: String?
+    var postWorkoutNote: String?
     var createdAt: Date = Foundation.Date()
     var updatedAt: Date = Foundation.Date()
     var deletedAt: Date?
@@ -251,6 +254,9 @@ final class WorkoutSessionRecord {
         completionDomainDay: String? = nil,
         startedEarly: Bool = false,
         note: String = "",
+        postWorkoutEnergyRaw: String? = nil,
+        postWorkoutSorenessRaw: String? = nil,
+        postWorkoutNote: String? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now,
         deletedAt: Date? = nil
@@ -268,6 +274,9 @@ final class WorkoutSessionRecord {
         self.completionDomainDay = completionDomainDay
         self.startedEarly = startedEarly
         self.note = note
+        self.postWorkoutEnergyRaw = postWorkoutEnergyRaw
+        self.postWorkoutSorenessRaw = postWorkoutSorenessRaw
+        self.postWorkoutNote = postWorkoutNote
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
@@ -665,6 +674,7 @@ final class CareOccurrenceRecord {
     var completedAt: Date?
     var skippedAt: Date?
     var rolledFromDomainDay: String?
+    var recurrencePayloadBeforeCompletion: String?
     var createdAt: Date = Foundation.Date()
     var updatedAt: Date = Foundation.Date()
 
@@ -678,6 +688,7 @@ final class CareOccurrenceRecord {
         completedAt: Date? = nil,
         skippedAt: Date? = nil,
         rolledFromDomainDay: String? = nil,
+        recurrencePayloadBeforeCompletion: String? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -690,6 +701,7 @@ final class CareOccurrenceRecord {
         self.completedAt = completedAt
         self.skippedAt = skippedAt
         self.rolledFromDomainDay = rolledFromDomainDay
+        self.recurrencePayloadBeforeCompletion = recurrencePayloadBeforeCompletion
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

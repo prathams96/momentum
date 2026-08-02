@@ -1,4 +1,11 @@
+import Foundation
 import SwiftData
+
+enum PersistenceStoreMode: Equatable {
+    case production
+    case localDevelopment
+    case preview
+}
 
 enum ModelContainerFactory {
     static let cloudContainerIdentifier = "iCloud.com.pratham.momentum"
@@ -35,6 +42,17 @@ enum ModelContainerFactory {
         return try ModelContainer(for: schema, configurations: [configuration])
     }
 
+    static func makeLocalDevelopment(at url: URL? = nil) throws -> ModelContainer {
+        let storeURL = try url ?? localStoreURL()
+        let configuration = ModelConfiguration(
+            "Momentum Local",
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
     static func makePreview() throws -> ModelContainer {
         let configuration = ModelConfiguration(
             "Momentum Preview",
@@ -42,5 +60,30 @@ enum ModelContainerFactory {
             isStoredInMemoryOnly: true
         )
         return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private static func localStoreURL() throws -> URL {
+        let fileManager = FileManager.default
+        guard let applicationSupport = fileManager.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            throw PersistenceStoreError.applicationSupportUnavailable
+        }
+
+        let directory = applicationSupport.appendingPathComponent("Momentum", isDirectory: true)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent("Momentum.store")
+    }
+}
+
+enum PersistenceStoreError: LocalizedError {
+    case applicationSupportUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .applicationSupportUnavailable:
+            "Momentum could not locate its local application storage."
+        }
     }
 }

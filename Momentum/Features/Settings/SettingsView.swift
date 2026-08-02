@@ -235,6 +235,7 @@ struct SettingsView: View {
             try modelContext.save()
             savedDraft = draft
             isSaving = false
+            Task { try? await DailyReconciler.reconcileAndNotify(in: modelContext) }
         } catch {
             modelContext.rollback()
             isSaving = false
@@ -349,6 +350,7 @@ private struct ResetAllDataSheet: View {
         errorMessage = nil
         do {
             try ResetAllDataService.reset(context: modelContext)
+            try SeedData.install(in: modelContext)
             await NotificationScheduler().cancelAllMomentumReminders()
             dismiss()
         } catch {

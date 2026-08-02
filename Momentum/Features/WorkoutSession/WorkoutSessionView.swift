@@ -7,12 +7,16 @@ struct WorkoutSessionView: View {
     @Environment(\.modelContext) private var modelContext
 
     @Query private var sessions: [WorkoutSessionRecord]
+    @Query private var allSessions: [WorkoutSessionRecord]
     @Query private var exerciseLogs: [ExerciseLogRecord]
+    @Query private var allExerciseLogs: [ExerciseLogRecord]
     @Query private var setLogs: [SetLogRecord]
     @Query private var prescriptions: [ExercisePrescriptionRecord]
+    @Query private var alternatives: [ExerciseAlternativeRecord]
     @Query private var loadSuggestions: [LoadSuggestionRecord]
 
     @State private var showFinishConfirmation = false
+    @State private var showPostWorkoutCheckIn = false
     @State private var saveError: String?
 
     private let sessionID: UUID
@@ -22,10 +26,12 @@ struct WorkoutSessionView: View {
         self.sessionID = sessionID
         self.domainDayCutoffMinutes = domainDayCutoffMinutes
         _sessions = Query(filter: #Predicate<WorkoutSessionRecord> { $0.id == sessionID })
+        _allSessions = Query()
         _exerciseLogs = Query(
             filter: #Predicate<ExerciseLogRecord> { $0.workoutSessionID == sessionID },
             sort: \ExerciseLogRecord.orderIndex
         )
+        _allExerciseLogs = Query()
     }
 
     private var session: WorkoutSessionRecord? { sessions.first }
@@ -52,7 +58,14 @@ struct WorkoutSessionView: View {
                                     exercise: exercise,
                                     sets: setLogs
                                         .filter { $0.exerciseLogID == exercise.id }
-                                        .sorted { $0.setNumber < $1.setNumber }
+                                        .sorted { $0.setNumber < $1.setNumber },
+                                    previousSets: previousSets(for: exercise),
+                                    alternatives: alternatives.filter { $0.prescriptionID == exercise.prescriptionID },
+                                    onSelectAlternative: { alternative in
+                                        exercise.exerciseNameSnapshot = alternative.displayName
+                                        exercise.updatedAt = .now
+                                    },
+                                    onSkipExercise: { skipExercise(exercise) }
                                 )
                             }
 
@@ -98,6 +111,11 @@ struct WorkoutSessionView: View {
             }
         }
         .interactiveDismissDisabled()
+        .sheet(isPresented: $showPostWorkoutCheckIn, onDismiss: { dismiss() }) {
+            if let session {
+                PostWorkoutCheckInView(session: session)
+            }
+        }
         .alert("Finish workout?", isPresented: $showFinishConfirmation) {
             Button("Keep logging", role: .cancel) {}
             Button("Finish workout") { finishWorkout() }
@@ -204,7 +222,37 @@ struct WorkoutSessionView: View {
         session.updatedAt = finishedAt
 
         guard persist() else { return }
-        dismiss()
+        showPostWorkoutCheckIn = true
+    }
+
+    private func previousSets(for exercise: ExerciseLogRecord) -> [SetLogRecord] {
+        guard let prescriptionID = exercise.prescriptionID,
+              let session,
+              let previousLog = (allExerciseLogs
+                  .filter { $0.prescriptionID == prescriptionID && $0.workoutSessionID != session.id }
+                  .compactMap { log -> (ExerciseLogRecord, WorkoutSessionRecord)? in
+                      guard let source = allSessions.first(where: { $0.id == log.workoutSessionID }),
+                            source.finishedAt != nil,
+                            source.startedAt < session.startedAt else { return nil }
+                      return (log, source)
+                  }
+                  .sorted(by: { $0.1.startedAt > $1.1.startedAt })
+                  .first?.0) else {
+            return []
+        }
+
+        let previousSetIDs = setLogs.filter { $0.exerciseLogID == previousLog.id }
+        return previousSetIDs.sorted { $0.setNumber < $1.setNumber }
+    }
+
+    private func skipExercise(_ exercise: ExerciseLogRecord) {
+        for set in setLogs where set.exerciseLogID == exercise.id && set.statusRaw == "pending" {
+            set.statusRaw = "skipped"
+            set.updatedAt = .now
+        }
+        exercise.statusRaw = "skipped"
+        exercise.updatedAt = .now
+        _ = persist()
     }
 }
 
@@ -219,9 +267,89 @@ private struct WorkoutNoteField: View {
     }
 }
 
+private struct PostWorkoutCheckInView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var session: WorkoutSessionRecord
+
+    @State private var energy = "steady"
+    @State private var soreness = "none"
+    @State private var note = ""
+    @State private var weight = ""
+
+    private let energyOptions = [("low", "Low"), ("steady", "Steady"), ("strong", "Strong")]
+    private let sorenessOptions = [("none", "None"), ("some", "Some"), ("high", "High")]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Energy", selection: $energy) {
+                        ForEach(energyOptions, id: \.0) { value, label in
+                            Text(label).tag(value)
+                        }
+                    }
+                    Picker("Soreness", selection: $soreness) {
+                        ForEach(sorenessOptions, id: \.0) { value, label in
+                            Text(label).tag(value)
+                        }
+                    }
+                } header: {
+                    Text("How did that feel?")
+                }
+
+                Section("Optional") {
+                    TextField("Body weight (kg)", text: $weight)
+                        .keyboardType(.decimalPad)
+                    TextField("Anything worth remembering?", text: $note, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+            }
+            .navigationTitle("Workout complete")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { save() }
+                }
+            }
+        }
+        .onAppear {
+            energy = session.postWorkoutEnergyRaw ?? energy
+            soreness = session.postWorkoutSorenessRaw ?? soreness
+            note = session.postWorkoutNote ?? ""
+        }
+    }
+
+    private func save() {
+        session.postWorkoutEnergyRaw = energy
+        session.postWorkoutSorenessRaw = soreness
+        session.postWorkoutNote = note.isEmpty ? nil : note
+        if let value = Double(weight), value > 0,
+           let day = PersistedDomainDay.decode(session.completionDomainDay ?? session.scheduledDomainDay) {
+            modelContext.insert(BodyMeasurementRecord(
+                kindRaw: "weightKg",
+                value: value,
+                measuredAt: .now,
+                domainDay: PersistedDomainDay.encode(day),
+                sourceRaw: "postWorkout"
+            ))
+        }
+        session.updatedAt = .now
+        try? modelContext.save()
+        dismiss()
+    }
+}
+
 private struct ExerciseLoggingSection: View {
     let exercise: ExerciseLogRecord
     let sets: [SetLogRecord]
+    let previousSets: [SetLogRecord]
+    let alternatives: [ExerciseAlternativeRecord]
+    let onSelectAlternative: (ExerciseAlternativeRecord) -> Void
+    let onSkipExercise: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
@@ -238,8 +366,27 @@ private struct ExerciseLoggingSection: View {
                 }
             }
 
+            Menu {
+                if !alternatives.isEmpty {
+                    Section("Alternatives") {
+                        ForEach(alternatives.sorted { $0.orderIndex < $1.orderIndex }) { alternative in
+                            Button(alternative.displayName) { onSelectAlternative(alternative) }
+                        }
+                    }
+                }
+                Button("Skip exercise", systemImage: "forward", role: .destructive, action: onSkipExercise)
+            } label: {
+                Label("Exercise options", systemImage: "ellipsis.circle")
+                    .font(.subheadline.weight(.medium))
+            }
+            .accessibilityLabel("Options for \(exercise.exerciseNameSnapshot)")
+
             ForEach(sets) { set in
-                WorkingSetRow(set: set, repetitionUnit: exercise.repUnitSnapshot)
+                WorkingSetRow(
+                    set: set,
+                    repetitionUnit: exercise.repUnitSnapshot,
+                    previous: previousSets.first { $0.setNumber == set.setNumber }
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -250,6 +397,7 @@ private struct ExerciseLoggingSection: View {
 private struct WorkingSetRow: View {
     @Bindable var set: SetLogRecord
     let repetitionUnit: String
+    let previous: SetLogRecord?
 
     private var rirBinding: Binding<Int> {
         Binding(
@@ -317,6 +465,23 @@ private struct WorkingSetRow: View {
                         .frame(width: 44, height: 44)
                 }
                 .accessibilityLabel("Set \(set.setNumber), \(set.statusRaw)")
+            }
+
+            if let previous, previous.statusRaw == "completed" {
+                Button {
+                    set.weightKg = previous.weightKg
+                    set.repetitions = previous.repetitions
+                    set.rir = previous.rir
+                    set.updatedAt = .now
+                } label: {
+                    Label(
+                        "Copy last time: \(DecimalFormatter.onePlace(previous.weightKg)) kg × \(previous.repetitions)",
+                        systemImage: "arrow.down.doc"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(MomentumTheme.pulse)
+                }
+                .buttonStyle(.plain)
             }
 
             TextField("Optional set note", text: $set.note)

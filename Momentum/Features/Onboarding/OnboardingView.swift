@@ -488,14 +488,15 @@ struct OnboardingView: View {
     }
 
     private func refreshICloudState() async {
-        #if targetEnvironment(simulator)
-        iCloudState = .available
-        return
-        #else
         if isUsingPreviewStore {
             iCloudState = .available
             return
         }
+
+        #if targetEnvironment(simulator)
+        iCloudState = .unavailable
+        return
+        #else
 
         do {
             switch try await CKContainer(identifier: "iCloud.com.pratham.momentum").accountStatus() {
@@ -616,11 +617,7 @@ struct OnboardingView: View {
     }
 
     private var isUsingPreviewStore: Bool {
-        #if targetEnvironment(simulator)
-        true
-        #else
         ProcessInfo.processInfo.arguments.contains("-usePreviewStore")
-        #endif
     }
 
     private func encode(_ day: DomainDay) -> String {

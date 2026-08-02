@@ -152,6 +152,27 @@ actor NotificationScheduler {
         }
     }
 
+    func scheduleFollowUp(
+        identifier: String,
+        title: String,
+        body: String,
+        categoryIdentifier: String,
+        userInfo: [String: String]
+    ) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.categoryIdentifier = categoryIdentifier
+        content.userInfo = userInfo
+        let request = UNNotificationRequest(
+            identifier: Self.identifierPrefix + "followup." + identifier,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 30 * 60, repeats: false)
+        )
+        try await center.add(request)
+    }
+
     func cancelAllMomentumReminders() async {
         let pending = await center.pendingNotificationRequests()
         let identifiers = pending.map(\.identifier).filter { $0.hasPrefix(Self.identifierPrefix) }

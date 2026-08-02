@@ -4,11 +4,14 @@ import SwiftData
 
 @MainActor
 enum DailyReconciler {
-    static func reconcile(in context: ModelContext, now: Date = .now) throws {
+    static func reconcile(
+        in context: ModelContext,
+        now: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent
+    ) throws {
         let settings = try context.fetch(FetchDescriptor<AppSettingsRecord>())
             .max { $0.updatedAt < $1.updatedAt }
         let cutoff = settings?.domainDayCutoffMinutes ?? 180
-        let calendar = Calendar.autoupdatingCurrent
         let today = DomainDay.containing(now, calendar: calendar, cutoffMinutes: cutoff)
         let yesterday = today.adding(days: -1, calendar: calendar)
         let todayValue = PersistedDomainDay.encode(today)
@@ -17,6 +20,7 @@ enum DailyReconciler {
         let routines = try context.fetch(FetchDescriptor<CareRoutineTemplateRecord>())
             .filter { !$0.isArchived }
         var occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
+        repairDuplicateOccurrences(occurrences, now: now)
 
         for occurrence in occurrences where occurrence.dueDomainDay == yesterdayValue && occurrence.statusRaw == "pending" {
             guard let routineID = occurrence.routineTemplateID,
@@ -60,7 +64,119 @@ enum DailyReconciler {
             occurrences.append(occurrence)
         }
 
+        let workouts = try context.fetch(FetchDescriptor<WorkoutTemplateRecord>())
+        let anchors = try context.fetch(FetchDescriptor<CycleAnchorRecord>())
+        let sessions = try context.fetch(FetchDescriptor<WorkoutSessionRecord>())
+        reconcileWorkoutEvent(
+            state: ScheduleProjection.evaluate(
+                workouts: workouts,
+                anchors: anchors,
+                sessions: sessions,
+                settings: settings.map { [$0] } ?? [],
+                now: now,
+                calendar: calendar
+            ),
+            currentDay: today,
+            sessions: sessions,
+            events: try context.fetch(FetchDescriptor<WorkoutDayEventRecord>()),
+            context: context,
+            now: now
+        )
+
         try context.save()
+    }
+
+    static func reconcileAndNotify(
+        in context: ModelContext,
+        now: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent
+    ) async throws {
+        try reconcile(in: context, now: now, calendar: calendar)
+
+        let settings = try context.fetch(FetchDescriptor<AppSettingsRecord>())
+            .max { $0.updatedAt < $1.updatedAt }
+        let occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
+        let nutritionDays = try context.fetch(FetchDescriptor<NutritionDayRecord>())
+        let workouts = try context.fetch(FetchDescriptor<WorkoutTemplateRecord>())
+        let anchors = try context.fetch(FetchDescriptor<CycleAnchorRecord>())
+        let sessions = try context.fetch(FetchDescriptor<WorkoutSessionRecord>())
+        let state = ScheduleProjection.evaluate(
+            workouts: workouts,
+            anchors: anchors,
+            sessions: sessions,
+            settings: settings.map { [$0] } ?? [],
+            now: now,
+            calendar: calendar
+        )
+        let currentDay = DomainDay.containing(
+            now,
+            calendar: calendar,
+            cutoffMinutes: settings?.domainDayCutoffMinutes ?? 180
+        )
+        let reminders = ReminderDeriver.reminders(
+            scheduleState: state,
+            settings: settings,
+            occurrences: occurrences,
+            nutritionDay: nutritionDays.first { $0.domainDay == PersistedDomainDay.encode(currentDay) },
+            now: now,
+            calendar: calendar
+        )
+        try await NotificationScheduler().reconcile(reminders)
+    }
+
+    private static func repairDuplicateOccurrences(
+        _ occurrences: [CareOccurrenceRecord],
+        now: Date
+    ) {
+        let grouped = Dictionary(grouping: occurrences) { occurrence in
+            "\(occurrence.routineTemplateID?.uuidString ?? "none")|\(occurrence.dueDomainDay)"
+        }
+        for group in grouped.values where group.count > 1 {
+            for duplicate in group.dropFirst().sorted(by: duplicateOrder) {
+                duplicate.statusRaw = "repairedDuplicate"
+                duplicate.updatedAt = now
+            }
+        }
+    }
+
+    private static func duplicateOrder(
+        _ lhs: CareOccurrenceRecord,
+        _ rhs: CareOccurrenceRecord
+    ) -> Bool {
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+        return lhs.id.uuidString < rhs.id.uuidString
+    }
+
+    private static func reconcileWorkoutEvent(
+        state: WorkoutScheduleState,
+        currentDay: DomainDay,
+        sessions: [WorkoutSessionRecord],
+        events: [WorkoutDayEventRecord],
+        context: ModelContext,
+        now: Date
+    ) {
+        guard case let .due(workoutID, dueDay, _) = state,
+              dueDay < currentDay else { return }
+        let dayValue = PersistedDomainDay.encode(dueDay)
+        let alreadyRecorded = events.contains {
+            $0.deletedAt == nil &&
+            $0.domainDay == dayValue &&
+            $0.dueWorkoutTemplateID == workoutID &&
+            ($0.kindRaw == "missed" || $0.kindRaw == "skipped")
+        }
+        let completedForDueDay = sessions.contains {
+            $0.deletedAt == nil &&
+            $0.finishedAt != nil &&
+            $0.scheduledDomainDay == dayValue
+        }
+        guard !alreadyRecorded, !completedForDueDay else { return }
+        context.insert(WorkoutDayEventRecord(
+            domainDay: dayValue,
+            dueWorkoutTemplateID: workoutID,
+            kindRaw: "missed",
+            createdAt: now,
+            updatedAt: now
+        ))
     }
 
     private static func isDue(

@@ -8,8 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		0C5205D600F7A38090084B6C /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518ECE49F1DC74E7E096DAF3 /* TodayView.swift */; };
+		1B1C71FFF1B3E34C9409CE71 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E04FFAD243BA176CEEB8976A /* HistoryView.swift */; };
+		256CE4182D2194BFAA4BC549 /* ScheduleProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716D031DEF3DEDF9C4475B8B /* ScheduleProjection.swift */; };
 		274C09979A71031039C391AF /* WorkoutSessionStarter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B3488B4639F019DAF3CA104 /* WorkoutSessionStarter.swift */; };
 		286524FF840404DCF6842C4D /* WorkoutSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1EE7B5A03B91E72C6CC0B1 /* WorkoutSessionView.swift */; };
+		2C9EDEFB1456C74EA4FA2D9A /* PlansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FC15A3757AA37FBDF63CD4 /* PlansView.swift */; };
+		3086A243967770735A44002A /* MomentumNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBEF3F0FD739CB3857950751 /* MomentumNotificationDelegate.swift */; };
 		3596142E93905367CE10A8C0 /* FoodEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E0516A274E184AD8C6D80F2 /* FoodEntrySheet.swift */; };
 		40198459694202BDD60F9E02 /* AppShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF468E89A0AFF7D4E13732C /* AppShell.swift */; };
 		4F185B7EAAD5307D658AA65B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 18F44509934DE5411172A086 /* Assets.xcassets */; };
@@ -23,9 +27,11 @@
 		9380186BF062F43DEA685817 /* CSVExportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0201B8A930F6158543DD016A /* CSVExportServiceTests.swift */; };
 		93A64853FD815EAC7A845AA3 /* MomentumCore in Frameworks */ = {isa = PBXBuildFile; productRef = 943E906AAD927231F3850337 /* MomentumCore */; };
 		93CF080CC4587919A6C24D4D /* MomentumApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB577315C556F0E9D1FE31D7 /* MomentumApp.swift */; };
+		A9CDBCE43CE17CCC2AFD8D9D /* DecimalFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DC1ABD16BA9B2DF5B766C4 /* DecimalFormatter.swift */; };
 		B0D5FD18F9D2EEAC0CAA5777 /* ResetAllDataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8301A45E79F89C480AD1D89F /* ResetAllDataService.swift */; };
 		B214406AE014943969EDE500 /* MomentumAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */; };
 		B26D5216FD3F1AF5C2981CEE /* SettingsDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAAC0904838B6D1B66197EC /* SettingsDraft.swift */; };
+		BA5704232D7B4B621D0039E6 /* ProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6814F9E7F84E203526F0484 /* ProgressView.swift */; };
 		D0BE6409EB8003F1787A70B9 /* PersistedDomainDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D654CF1580796FD4CD4709E3 /* PersistedDomainDay.swift */; };
 		D23C4833E0D282C1A7673DE3 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3874E4291A3DB3650264F7E3 /* AppTab.swift */; };
 		D5F1AF81B6FAEB989C0A62DD /* CSVExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B01068415240D94B849EC4C /* CSVExportService.swift */; };
@@ -33,7 +39,9 @@
 		E3951258E29E40BC51AC2A2C /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 021AEB3CD665783BBE52CF25 /* SeedData.swift */; };
 		EE3C431329745C7CF955BCE3 /* SettingsPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D5CFC5434D3E55A23F3368 /* SettingsPersistenceTests.swift */; };
 		F038DB4DB8348CA8F0B9C4FA /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 039CBAB5362B83A6BE6B4FB5 /* Localizable.xcstrings */; };
+		F3722D87BE57FD97ECD00B30 /* NutritionDayService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E69E4C332309D294E925EF /* NutritionDayService.swift */; };
 		F98A9EE097DF2493C38490BF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8AD9093FBD9C327C0E7849AF /* PrivacyInfo.xcprivacy */; };
+		FE2BB7970AF7C31B03D878E0 /* ReminderDeriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D49B4900AB51EC4B0E748071 /* ReminderDeriver.swift */; };
 		FF7E74730234AD02DC24E2B9 /* CareRoutineSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48BECDF86FA4CE25EC2DAF01 /* CareRoutineSheet.swift */; };
 /* End PBXBuildFile section */
 
@@ -61,6 +69,7 @@
 		1662D511CADD7FAE56F3A95E /* MomentumTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MomentumTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		18F44509934DE5411172A086 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1B7316759B620D82328D71CB /* MomentumTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumTheme.swift; sourceTree = "<group>"; };
+		22DC1ABD16BA9B2DF5B766C4 /* DecimalFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecimalFormatter.swift; sourceTree = "<group>"; };
 		2A1EE7B5A03B91E72C6CC0B1 /* WorkoutSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSessionView.swift; sourceTree = "<group>"; };
 		3874E4291A3DB3650264F7E3 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
 		422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumAppTests.swift; sourceTree = "<group>"; };
@@ -68,6 +77,7 @@
 		4B01068415240D94B849EC4C /* CSVExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVExportService.swift; sourceTree = "<group>"; };
 		518ECE49F1DC74E7E096DAF3 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		5B3488B4639F019DAF3CA104 /* WorkoutSessionStarter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSessionStarter.swift; sourceTree = "<group>"; };
+		716D031DEF3DEDF9C4475B8B /* ScheduleProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleProjection.swift; sourceTree = "<group>"; };
 		74F86E88F4662891FE8FB971 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		8301A45E79F89C480AD1D89F /* ResetAllDataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetAllDataService.swift; sourceTree = "<group>"; };
 		84BF7C2AB11F3A670B6DDC31 /* Momentum.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Momentum.entitlements; sourceTree = "<group>"; };
@@ -81,10 +91,16 @@
 		AB577315C556F0E9D1FE31D7 /* MomentumApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumApp.swift; sourceTree = "<group>"; };
 		B60228F692B0231F197F01B2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B69EEEA475A7AD0BF07A19EE /* Momentum.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Momentum.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B7E69E4C332309D294E925EF /* NutritionDayService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDayService.swift; sourceTree = "<group>"; };
+		C6814F9E7F84E203526F0484 /* ProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressView.swift; sourceTree = "<group>"; };
 		CAA1527FE381955F4E020EA6 /* MomentumUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumUITests.swift; sourceTree = "<group>"; };
+		D49B4900AB51EC4B0E748071 /* ReminderDeriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderDeriver.swift; sourceTree = "<group>"; };
 		D654CF1580796FD4CD4709E3 /* PersistedDomainDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistedDomainDay.swift; sourceTree = "<group>"; };
+		DBEF3F0FD739CB3857950751 /* MomentumNotificationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumNotificationDelegate.swift; sourceTree = "<group>"; };
 		DBF3B7506D96D5CA0A0CC034 /* fitness-tracker */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "fitness-tracker"; path = .; sourceTree = SOURCE_ROOT; };
+		E04FFAD243BA176CEEB8976A /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		E072B4895EE3EA2FDFA51B07 /* SchemaV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaV1.swift; sourceTree = "<group>"; };
+		E3FC15A3757AA37FBDF63CD4 /* PlansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlansView.swift; sourceTree = "<group>"; };
 		EACE83CB0C4A93124D0ECF85 /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
 		ED7DC642BB270ADDB827CB86 /* DailyReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyReconciler.swift; sourceTree = "<group>"; };
 		FAF468E89A0AFF7D4E13732C /* AppShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShell.swift; sourceTree = "<group>"; };
@@ -120,6 +136,7 @@
 				BE2CB141560D9092840BEAC7 /* Export */,
 				160D402DA6A1A2F4A14B219D /* Notifications */,
 				81F8B31EB610A749DEDF99C3 /* Persistence */,
+				9907E42C247644B132AD576A /* Support */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -142,6 +159,7 @@
 			isa = PBXGroup;
 			children = (
 				8E0516A274E184AD8C6D80F2 /* FoodEntrySheet.swift */,
+				B7E69E4C332309D294E925EF /* NutritionDayService.swift */,
 			);
 			path = Nutrition;
 			sourceTree = "<group>";
@@ -149,7 +167,9 @@
 		160D402DA6A1A2F4A14B219D /* Notifications */ = {
 			isa = PBXGroup;
 			children = (
+				DBEF3F0FD739CB3857950751 /* MomentumNotificationDelegate.swift */,
 				EACE83CB0C4A93124D0ECF85 /* NotificationScheduler.swift */,
+				D49B4900AB51EC4B0E748071 /* ReminderDeriver.swift */,
 			);
 			path = Notifications;
 			sourceTree = "<group>";
@@ -163,12 +183,23 @@
 			path = WorkoutSession;
 			sourceTree = "<group>";
 		};
+		40B0968BC6A0D38C5B88A108 /* Plans */ = {
+			isa = PBXGroup;
+			children = (
+				E3FC15A3757AA37FBDF63CD4 /* PlansView.swift */,
+			);
+			path = Plans;
+			sourceTree = "<group>";
+		};
 		465FDAE7EBD421BE95EB701A /* Features */ = {
 			isa = PBXGroup;
 			children = (
 				96A9E983ED34A824185A5CEA /* Care */,
+				9D1D11459D5742C9A883A9E0 /* History */,
 				0E652CC4679DB689A8CF79B7 /* Nutrition */,
 				F258EACC465431FF70CCFD1A /* Onboarding */,
+				40B0968BC6A0D38C5B88A108 /* Plans */,
+				8033D6809647C56DB190574C /* Progress */,
 				46A5FB17A76514D0EF59DCB8 /* Settings */,
 				EA5D053652E058726BA65EED /* Today */,
 				206D2AAEDDA7AB13D8161694 /* WorkoutSession */,
@@ -204,6 +235,14 @@
 			path = MomentumTests;
 			sourceTree = "<group>";
 		};
+		8033D6809647C56DB190574C /* Progress */ = {
+			isa = PBXGroup;
+			children = (
+				C6814F9E7F84E203526F0484 /* ProgressView.swift */,
+			);
+			path = Progress;
+			sourceTree = "<group>";
+		};
 		81F8B31EB610A749DEDF99C3 /* Persistence */ = {
 			isa = PBXGroup;
 			children = (
@@ -221,6 +260,22 @@
 				48BECDF86FA4CE25EC2DAF01 /* CareRoutineSheet.swift */,
 			);
 			path = Care;
+			sourceTree = "<group>";
+		};
+		9907E42C247644B132AD576A /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				22DC1ABD16BA9B2DF5B766C4 /* DecimalFormatter.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		9D1D11459D5742C9A883A9E0 /* History */ = {
+			isa = PBXGroup;
+			children = (
+				E04FFAD243BA176CEEB8976A /* HistoryView.swift */,
+			);
+			path = History;
 			sourceTree = "<group>";
 		};
 		A22995A19C0933ED75B70773 /* Resources */ = {
@@ -273,6 +328,7 @@
 			isa = PBXGroup;
 			children = (
 				D654CF1580796FD4CD4709E3 /* PersistedDomainDay.swift */,
+				716D031DEF3DEDF9C4475B8B /* ScheduleProjection.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -432,14 +488,22 @@
 				D5F1AF81B6FAEB989C0A62DD /* CSVExportService.swift in Sources */,
 				FF7E74730234AD02DC24E2B9 /* CareRoutineSheet.swift in Sources */,
 				5A31A87DED952CDCF2D242DD /* DailyReconciler.swift in Sources */,
+				A9CDBCE43CE17CCC2AFD8D9D /* DecimalFormatter.swift in Sources */,
 				3596142E93905367CE10A8C0 /* FoodEntrySheet.swift in Sources */,
+				1B1C71FFF1B3E34C9409CE71 /* HistoryView.swift in Sources */,
 				72725C7A39900A6DBEE280EA /* ModelContainerFactory.swift in Sources */,
 				93CF080CC4587919A6C24D4D /* MomentumApp.swift in Sources */,
+				3086A243967770735A44002A /* MomentumNotificationDelegate.swift in Sources */,
 				DE0CA459D5E3EE1256248969 /* MomentumTheme.swift in Sources */,
 				7D266F79539CB07F450A2D7A /* NotificationScheduler.swift in Sources */,
+				F3722D87BE57FD97ECD00B30 /* NutritionDayService.swift in Sources */,
 				53ECA5F1D5F9B2DEAA0407B2 /* OnboardingView.swift in Sources */,
 				D0BE6409EB8003F1787A70B9 /* PersistedDomainDay.swift in Sources */,
+				2C9EDEFB1456C74EA4FA2D9A /* PlansView.swift in Sources */,
+				BA5704232D7B4B621D0039E6 /* ProgressView.swift in Sources */,
+				FE2BB7970AF7C31B03D878E0 /* ReminderDeriver.swift in Sources */,
 				B0D5FD18F9D2EEAC0CAA5777 /* ResetAllDataService.swift in Sources */,
+				256CE4182D2194BFAA4BC549 /* ScheduleProjection.swift in Sources */,
 				8AAB50CFC88D10E3DE45A4E1 /* SchemaV1.swift in Sources */,
 				E3951258E29E40BC51AC2A2C /* SeedData.swift in Sources */,
 				B26D5216FD3F1AF5C2981CEE /* SettingsDraft.swift in Sources */,

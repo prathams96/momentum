@@ -1,3 +1,4 @@
+import MomentumCore
 import SwiftData
 import SwiftUI
 
@@ -8,6 +9,8 @@ struct CareRoutineSheet: View {
     @Query private var occurrences: [CareOccurrenceRecord]
     @Query private var completions: [CareTaskCompletionRecord]
     @Query private var taskTemplates: [CareTaskTemplateRecord]
+    @Query private var routines: [CareRoutineTemplateRecord]
+    @Query private var settings: [AppSettingsRecord]
 
     @State private var saveError: String?
 
@@ -75,16 +78,30 @@ struct CareRoutineSheet: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button(occurrence?.statusRaw == "completed" ? "Completed" : "Complete routine") {
-                    completeRoutine()
+                HStack(spacing: MomentumSpacing.sm) {
+                    if occurrence?.statusRaw == "completed" {
+                        Button("Undo completion", systemImage: "arrow.uturn.backward") {
+                            undoCompletion()
+                        }
+                        .buttonStyle(.bordered)
+                    } else if occurrence?.statusRaw == "pending" {
+                        Button("Skip today", systemImage: "forward") {
+                            skipRoutine()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    Button(occurrence?.statusRaw == "completed" ? "Completed" : "Complete routine") {
+                        completeRoutine()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(MomentumTheme.pulse)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                    .disabled(!canCompleteRoutine || occurrence?.statusRaw == "completed")
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(MomentumTheme.pulse)
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
                 .padding(MomentumSpacing.md)
                 .background(.bar)
-                .disabled(!canCompleteRoutine || occurrence?.statusRaw == "completed")
             }
         }
         .alert("Couldn’t save routine", isPresented: Binding(
@@ -132,14 +149,75 @@ struct CareRoutineSheet: View {
         occurrence.completedAt = .now
         occurrence.skippedAt = nil
         occurrence.updatedAt = .now
+        advanceAlternatingRoutineIfNeeded(for: occurrence)
         guard persist() else { return }
         dismiss()
+    }
+
+    private func skipRoutine() {
+        guard let occurrence, occurrence.statusRaw == "pending" else { return }
+        occurrence.statusRaw = "skipped"
+        occurrence.skippedAt = .now
+        occurrence.completedAt = nil
+        occurrence.updatedAt = .now
+        guard persist() else { return }
+        dismiss()
+    }
+
+    private func undoCompletion() {
+        guard let occurrence, occurrence.statusRaw == "completed" else { return }
+        occurrence.statusRaw = "pending"
+        occurrence.completedAt = nil
+        occurrence.updatedAt = .now
+        for completion in completions {
+            completion.statusRaw = "pending"
+            completion.completedAt = nil
+            completion.selectedVariant = nil
+            completion.updatedAt = .now
+        }
+        if let routineID = occurrence.routineTemplateID,
+           let routine = routines.first(where: { $0.id == routineID }),
+           let previousPayload = occurrence.recurrencePayloadBeforeCompletion {
+            routine.recurrencePayload = previousPayload
+            routine.updatedAt = .now
+            occurrence.recurrencePayloadBeforeCompletion = nil
+        }
+        guard persist() else { return }
+    }
+
+    private func advanceAlternatingRoutineIfNeeded(for occurrence: CareOccurrenceRecord) {
+        guard let routineID = occurrence.routineTemplateID,
+              let routine = routines.first(where: { $0.id == routineID }),
+              routine.recurrenceKindRaw == "alternatingInterval",
+              let data = routine.recurrencePayload.data(using: .utf8),
+              let payload = try? JSONDecoder().decode(CareRecurrencePayload.self, from: data) else {
+            return
+        }
+        let calendar = Calendar.autoupdatingCurrent
+        let currentDay = DomainDay.containing(
+            .now,
+            calendar: calendar,
+            cutoffMinutes: settings.max(by: { $0.updatedAt < $1.updatedAt })?.domainDayCutoffMinutes ?? 180
+        )
+        guard let advanced = CareScheduleEngine().advancedAlternatingPayload(
+            afterCompletionOn: currentDay,
+            payload: payload,
+            calendar: calendar
+        ),
+        let encoded = try? JSONEncoder().encode(advanced),
+        let value = String(data: encoded, encoding: .utf8) else {
+            return
+        }
+        occurrence.recurrencePayloadBeforeCompletion = routine.recurrencePayload
+        routine.recurrencePayload = value
+        routine.updatedAt = .now
     }
 
     @discardableResult
     private func persist() -> Bool {
         do {
             try modelContext.save()
+            Task { try? await DailyReconciler.reconcileAndNotify(in: modelContext) }
             return true
         } catch {
             saveError = "Your changes were kept. Try saving again."

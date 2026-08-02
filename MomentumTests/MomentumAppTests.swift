@@ -11,6 +11,38 @@ final class MomentumAppTests: XCTestCase {
         XCTAssertNotNil(container)
     }
 
+    func testLocalDevelopmentContainerPersistsFactsAcrossReload() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MomentumLocal-\(UUID().uuidString).store")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        do {
+            let container = try ModelContainerFactory.makeLocalDevelopment(at: url)
+            let context = container.mainContext
+            try SeedData.install(
+                in: context,
+                currentDomainDay: DomainDay(year: 2026, month: 8, day: 2)
+            )
+            context.insert(FoodEntryRecord(
+                domainDay: "2026-08-02",
+                nameSnapshot: "Reloadable food",
+                caloriesPerBaseServing: 100,
+                proteinPerBaseServing: 10
+            ))
+            try context.save()
+        }
+
+        let reloaded = try ModelContainerFactory.makeLocalDevelopment(at: url)
+        XCTAssertEqual(
+            try reloaded.mainContext.fetchCount(FetchDescriptor<FoodEntryRecord>()),
+            1
+        )
+        XCTAssertEqual(
+            try reloaded.mainContext.fetch(FetchDescriptor<AppSettingsRecord>()).count,
+            1
+        )
+    }
+
     func testSeedDataIsIdempotentAndContainsCanonicalRoutines() throws {
         let container = try ModelContainerFactory.makePreview()
         try SeedData.install(
@@ -231,5 +263,107 @@ final class MomentumAppTests: XCTestCase {
                 return XCTFail("Expected an open-session error, got \(error)")
             }
         }
+    }
+
+    func testDailyReconcilerRecordsOneMissedWorkoutAndIsIdempotent() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let dueDay = DomainDay(year: 2026, month: 8, day: 2)
+        try SeedData.install(in: context, currentDomainDay: dueDay)
+        let anchor = try XCTUnwrap(context.fetch(FetchDescriptor<CycleAnchorRecord>()).first)
+        anchor.firstDueDomainDay = PersistedDomainDay.encode(dueDay)
+        try context.save()
+
+        let now = PersistedDomainDay.date(for: DomainDay(year: 2026, month: 8, day: 3), calendar: .autoupdatingCurrent, hour: 12)!
+        try DailyReconciler.reconcile(in: context, now: now)
+        try DailyReconciler.reconcile(in: context, now: now)
+
+        let events = try context.fetch(FetchDescriptor<WorkoutDayEventRecord>())
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.kindRaw, "missed")
+        XCTAssertEqual(events.first?.domainDay, "2026-08-02")
+    }
+
+    func testExplicitWorkoutSkipPreventsMissedEvent() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let dueDay = DomainDay(year: 2026, month: 8, day: 2)
+        try SeedData.install(in: context, currentDomainDay: dueDay)
+        let anchor = try XCTUnwrap(context.fetch(FetchDescriptor<CycleAnchorRecord>()).first)
+        anchor.firstDueDomainDay = PersistedDomainDay.encode(dueDay)
+        let workoutID = anchor.nextWorkoutTemplateID
+        context.insert(WorkoutDayEventRecord(
+            domainDay: PersistedDomainDay.encode(dueDay),
+            dueWorkoutTemplateID: workoutID,
+            kindRaw: "skipped"
+        ))
+        try context.save()
+
+        let now = PersistedDomainDay.date(for: DomainDay(year: 2026, month: 8, day: 3), calendar: .autoupdatingCurrent, hour: 12)!
+        try DailyReconciler.reconcile(in: context, now: now)
+
+        let events = try context.fetch(FetchDescriptor<WorkoutDayEventRecord>())
+        XCTAssertEqual(events.map(\.kindRaw), ["skipped"])
+    }
+
+    func testReminderDeriverUsesStableWorkoutAndEveningIdentifiers() throws {
+        let settings = AppSettingsRecord(
+            domainDayCutoffMinutes: 180,
+            workoutNotificationMinutes: 18 * 60,
+            nutritionReminderMinutes: 22 * 60
+        )
+        let now = PersistedDomainDay.date(
+            for: DomainDay(year: 2026, month: 8, day: 2),
+            calendar: .autoupdatingCurrent,
+            hour: 12
+        )!
+        let workoutID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
+        let reminders = ReminderDeriver.reminders(
+            scheduleState: .due(
+                workoutID: workoutID,
+                dueDay: DomainDay(year: 2026, month: 8, day: 2),
+                overdueBy: 0
+            ),
+            settings: settings,
+            occurrences: [],
+            nutritionDay: NutritionDayRecord(domainDay: "2026-08-02"),
+            now: now,
+            calendar: .autoupdatingCurrent
+        )
+
+        XCTAssertEqual(
+            reminders.map(\.identifier),
+            ["workout.\(workoutID.uuidString).2026-08-02", "evening.2026-08-02"]
+        )
+    }
+
+    func testNutritionDayFinalizationSnapshotsTargetAndCanReopen() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let day = DomainDay(year: 2026, month: 8, day: 2)
+        let target = NutritionTargetRecord(
+            effectiveFrom: "2026-08-02",
+            calorieDisplayTarget: 2_400,
+            calorieMinimum: 2_300,
+            calorieMaximum: 2_500,
+            proteinMinimumGrams: 150
+        )
+        context.insert(target)
+
+        try NutritionDayService.finalize(
+            domainDay: day,
+            target: target,
+            existing: nil,
+            context: context,
+            now: Date(timeIntervalSince1970: 100)
+        )
+
+        let finalized = try XCTUnwrap(context.fetch(FetchDescriptor<NutritionDayRecord>()).first)
+        XCTAssertEqual(finalized.calorieMinimumSnapshot, 2_300)
+        XCTAssertEqual(finalized.proteinMinimumSnapshot, 150)
+        XCTAssertNotNil(finalized.finalizedAt)
+
+        try NutritionDayService.reopen(existing: finalized, context: context)
+        XCTAssertNil(finalized.finalizedAt)
     }
 }

@@ -3,6 +3,23 @@ import MomentumCore
 import SwiftData
 import SwiftUI
 
+private enum FoodEntryDestination: Identifiable {
+    case new
+    case edit(UUID)
+
+    var id: String {
+        switch self {
+        case .new: "new"
+        case let .edit(id): "edit-\(id.uuidString)"
+        }
+    }
+
+    var existingEntryID: UUID? {
+        if case let .edit(id) = self { return id }
+        return nil
+    }
+}
+
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settings: [AppSettingsRecord]
@@ -11,21 +28,21 @@ struct TodayView: View {
     @Query private var exercises: [ExercisePrescriptionRecord]
     @Query private var sessions: [WorkoutSessionRecord]
     @Query private var occurrences: [CareOccurrenceRecord]
+    @Query private var foodEntries: [FoodEntryRecord]
+    @Query private var nutritionDays: [NutritionDayRecord]
+    @Query private var nutritionTargets: [NutritionTargetRecord]
 
     @State private var presentedSessionID: UUID?
-    @State private var showFoodEntry = false
+    @State private var foodDestination: FoodEntryDestination?
     @State private var presentedCareOccurrenceID: UUID?
     @State private var startError: String?
     @State private var reconciliationError: String?
+    @State private var nutritionError: String?
 
     private let calendar = Calendar.autoupdatingCurrent
 
     private var currentDomainDay: DomainDay {
-        DomainDay.containing(
-            .now,
-            calendar: calendar,
-            cutoffMinutes: settings.first?.domainDayCutoffMinutes ?? 180
-        )
+        ScheduleProjection.currentDomainDay(settings: settings, now: .now, calendar: calendar)
     }
 
     private var activeSession: WorkoutSessionRecord? {
@@ -40,51 +57,13 @@ struct TodayView: View {
     }
 
     private var scheduleState: WorkoutScheduleState {
-        if openSessions.count > 1 {
-            return .needsRepair(reason: .duplicateActiveSessions)
-        }
-        guard let anchor = anchors.max(by: { $0.updatedAt < $1.updatedAt }),
-              let firstDueDay = PersistedDomainDay.decode(anchor.firstDueDomainDay) else {
-            return .needsRepair(reason: .missingAnchorWorkout)
-        }
-
-        let templates = workouts
-            .filter { !$0.isArchived }
-            .map {
-                WorkoutTemplate(
-                    id: $0.id,
-                    name: $0.name,
-                    sequenceIndex: $0.sequenceIndex,
-                    recoveryDaysAfter: $0.recoveryDaysAfter
-                )
-            }
-        let completed = sessions.filter { $0.deletedAt == nil }.compactMap { session -> CompletedWorkoutSession? in
-            guard let finishedAt = session.finishedAt,
-                  let workoutID = session.workoutTemplateID,
-                  let completionValue = session.completionDomainDay,
-                  let completionDay = PersistedDomainDay.decode(completionValue) else {
-                return nil
-            }
-            return CompletedWorkoutSession(
-                id: session.id,
-                workoutTemplateID: workoutID,
-                completionDomainDay: completionDay,
-                finishedAt: finishedAt,
-                sequenceIndexSnapshot: session.sequenceIndexSnapshot,
-                recoveryDaysAfterSnapshot: session.recoveryDaysAfterSnapshot,
-                nextWorkoutTemplateIDSnapshot: session.nextWorkoutTemplateIDSnapshot
-            )
-        }
-
-        return ScheduleEngine().evaluate(
-            ScheduleInput(
-                activeWorkoutTemplates: templates,
-                cycleAnchor: CycleAnchor(nextWorkoutID: anchor.nextWorkoutTemplateID, firstDueDomainDay: firstDueDay),
-                completedSessions: completed,
-                currentDomainDay: currentDomainDay,
-                calendar: calendar,
-                activeSessionID: activeSession?.id
-            )
+        ScheduleProjection.evaluate(
+            workouts: workouts,
+            anchors: anchors,
+            sessions: sessions,
+            settings: settings,
+            now: .now,
+            calendar: calendar
         )
     }
 
@@ -110,6 +89,7 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: MomentumSpacing.xxl) {
                 dateLine
                 workoutSection
+                nutritionSection
                 activitySection
                 consistencySection
             }
@@ -132,24 +112,27 @@ struct TodayView: View {
         }
         .task(id: PersistedDomainDay.encode(currentDomainDay)) {
             do {
-                try DailyReconciler.reconcile(in: modelContext)
+                try await DailyReconciler.reconcileAndNotify(in: modelContext)
             } catch {
                 reconciliationError = "Today’s reminders could not be refreshed. Try again in a moment."
             }
         }
-        .sheet(isPresented: Binding(
+        .fullScreenCover(isPresented: Binding(
             get: { presentedSessionID != nil },
             set: { if !$0 { presentedSessionID = nil } }
         )) {
             if let sessionID = presentedSessionID {
                 WorkoutSessionView(
                     sessionID: sessionID,
-                    domainDayCutoffMinutes: settings.first?.domainDayCutoffMinutes ?? 180
+                    domainDayCutoffMinutes: settings.max(by: { $0.updatedAt < $1.updatedAt })?.domainDayCutoffMinutes ?? 180
                 )
             }
         }
-        .sheet(isPresented: $showFoodEntry) {
-            FoodEntrySheet(domainDay: PersistedDomainDay.encode(currentDomainDay))
+        .sheet(item: $foodDestination) { destination in
+            FoodEntrySheet(
+                domainDay: PersistedDomainDay.encode(currentDomainDay),
+                existingEntryID: destination.existingEntryID
+            )
         }
         .sheet(isPresented: Binding(
             get: { presentedCareOccurrenceID != nil },
@@ -174,6 +157,14 @@ struct TodayView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(reconciliationError ?? "Try again in a moment.")
+        }
+        .alert("Couldn’t update nutrition", isPresented: Binding(
+            get: { nutritionError != nil },
+            set: { if !$0 { nutritionError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(nutritionError ?? "Your food entries are still safe.")
         }
     }
 
@@ -306,16 +297,188 @@ struct TodayView: View {
                 .font(.title3.bold())
 
             VStack(spacing: 0) {
-                Button { showFoodEntry = true } label: {
-                    ActivityRow(symbol: "fork.knife", title: "Nutrition", detail: "Log food when you eat", tint: .secondary)
-                }
-                Divider().padding(.leading, 52)
                 careButton(for: morningOccurrence, fallbackTitle: "Morning care", symbol: "sun.max", detail: "Daily routine")
                 Divider().padding(.leading, 52)
                 careButton(for: nightOccurrence, fallbackTitle: "Night care", symbol: "moon", detail: "Current weekday routine")
                 Divider().padding(.leading, 52)
                 careButton(for: hairOccurrence, fallbackTitle: "Hair care", symbol: "drop", detail: "Alternating routine")
             }
+        }
+    }
+
+    private var nutritionSection: some View {
+        let target = nutritionTarget
+        let evaluation = target.flatMap { target in
+            try? NutritionCalculator().evaluate(
+                totals: nutritionTotals,
+                against: NutritionTargetRange(
+                    calorieMinimum: Decimal(target.calorieMinimum),
+                    calorieMaximum: Decimal(target.calorieMaximum),
+                    proteinMinimum: Decimal(target.proteinMinimumGrams)
+                )
+            )
+        }
+
+        return VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Nutrition")
+                    .font(.title3.bold())
+                Spacer()
+                Text(nutritionDay?.finalizedAt == nil ? "Open" : "Finalized")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(nutritionDay?.finalizedAt == nil ? .secondary : MomentumTheme.success)
+            }
+
+            VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
+                HStack {
+                    nutritionMetric(
+                        title: "Calories",
+                        value: "\(DecimalFormatter.whole(nutritionTotals.calories)) kcal",
+                        detail: target.map { "Range \($0.calorieMinimum)–\($0.calorieMaximum)" } ?? "Set a target in Plans"
+                    )
+                    Spacer()
+                    nutritionMetric(
+                        title: "Protein",
+                        value: "\(DecimalFormatter.onePlace(nutritionTotals.proteinGrams)) g",
+                        detail: target.map { "Minimum \($0.proteinMinimumGrams) g" } ?? "Set a target in Plans"
+                    )
+                }
+
+                if let evaluation {
+                    Label(
+                        evaluation.meetsTarget ? "Inside today’s targets" : "Keep logging to see the full picture",
+                        systemImage: evaluation.meetsTarget ? "checkmark.circle.fill" : "circle.dashed"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(evaluation.meetsTarget ? MomentumTheme.success : .secondary)
+                }
+            }
+            .padding(MomentumSpacing.md)
+            .background(Color(uiColor: .secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            if activeFoodEntries.isEmpty {
+                Text("Nothing logged yet. Start with the food you actually ate.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(activeFoodEntries) { entry in
+                    Button { openFoodEntry(entry.id) } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(entry.nameSnapshot).font(.headline)
+                                Text("\(DecimalFormatter.whole(entry.totalCalories)) kcal · \(DecimalFormatter.onePlace(entry.totalProteinGrams)) g protein")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(entry.servingMultiplier.formatted(.number.precision(.fractionLength(0...2))))
+                                .font(.subheadline.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) { deleteFoodEntry(entry) } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                        Button { duplicateFoodEntry(entry) } label: {
+                            Label("Duplicate", systemImage: "plus.square.on.square")
+                        }
+                        .tint(MomentumTheme.pulse)
+                    }
+                }
+            }
+
+            HStack {
+                Button("Log food", systemImage: "plus") { openFoodEntry(nil) }
+                    .buttonStyle(.bordered)
+                    .tint(MomentumTheme.pulse)
+                Spacer()
+                Button(
+                    nutritionDay?.finalizedAt == nil ? "Finish logging today" : "Reopen",
+                    systemImage: nutritionDay?.finalizedAt == nil ? "checkmark" : "arrow.uturn.backward"
+                ) {
+                    toggleNutritionFinalization()
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private func nutritionMetric(title: String, value: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Text(value).font(.title3.monospacedDigit().weight(.bold))
+            Text(detail).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private var activeFoodEntries: [FoodEntryRecord] {
+        let day = PersistedDomainDay.encode(currentDomainDay)
+        return foodEntries
+            .filter { $0.domainDay == day && $0.deletedAt == nil }
+            .sorted { ($0.consumedAt, $0.id.uuidString) < ($1.consumedAt, $1.id.uuidString) }
+    }
+
+    private var nutritionDay: NutritionDayRecord? {
+        NutritionDayService.day(for: currentDomainDay, in: nutritionDays)
+    }
+
+    private var nutritionTarget: NutritionTargetRecord? {
+        NutritionDayService.target(for: currentDomainDay, targets: nutritionTargets)
+    }
+
+    private var nutritionTotals: NutritionTotals {
+        NutritionCalculator().dayTotals(entries: activeFoodEntries.map {
+            NutritionTotals(calories: Decimal(string: String($0.totalCalories)) ?? 0, proteinGrams: Decimal(string: String($0.totalProteinGrams)) ?? 0)
+        })
+    }
+
+    private func openFoodEntry(_ id: UUID?) {
+        foodDestination = id.map(FoodEntryDestination.edit) ?? .new
+    }
+
+    private func duplicateFoodEntry(_ entry: FoodEntryRecord) {
+        let duplicate = FoodEntryRecord(
+            domainDay: entry.domainDay,
+            consumedAt: .now,
+            presetID: entry.presetID,
+            nameSnapshot: entry.nameSnapshot,
+            caloriesPerBaseServing: entry.caloriesPerBaseServing,
+            proteinPerBaseServing: entry.proteinPerBaseServing,
+            servingMultiplier: entry.servingMultiplier,
+            totalCalories: entry.totalCalories,
+            totalProteinGrams: entry.totalProteinGrams
+        )
+        modelContext.insert(duplicate)
+        do { try modelContext.save() }
+        catch { nutritionError = "The duplicate was not saved. Try again." }
+    }
+
+    private func deleteFoodEntry(_ entry: FoodEntryRecord) {
+        entry.deletedAt = .now
+        entry.updatedAt = .now
+        do { try modelContext.save() }
+        catch { nutritionError = "The food entry was kept. Try again." }
+    }
+
+    private func toggleNutritionFinalization() {
+        do {
+            if nutritionDay?.finalizedAt == nil {
+                try NutritionDayService.finalize(
+                    domainDay: currentDomainDay,
+                    target: nutritionTarget,
+                    existing: nutritionDay,
+                    context: modelContext
+                )
+            } else {
+                try NutritionDayService.reopen(existing: nutritionDay, context: modelContext)
+            }
+        } catch {
+            nutritionError = "Your nutrition status was not changed. Try again."
         }
     }
 

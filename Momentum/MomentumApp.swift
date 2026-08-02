@@ -27,31 +27,38 @@ private enum PersistenceBootstrap {
     case failed
 
     init() {
-        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        #if targetEnvironment(simulator)
-        let isRunningInSimulator = true
-        #else
-        let isRunningInSimulator = false
-        #endif
-
-        if isRunningTests || isRunningInSimulator || ProcessInfo.processInfo.arguments.contains("-usePreviewStore") {
-            do {
-                let container = try ModelContainerFactory.makePreview()
-                try SeedData.install(in: container.mainContext)
-                self = .ready(container)
-            } catch {
-                self = .failed
-            }
-            return
-        }
-
         do {
-            let container = try ModelContainerFactory.makeProduction()
+            let container = try Self.makeContainer(for: Self.storeMode())
             try SeedData.install(in: container.mainContext)
             self = .ready(container)
         } catch {
             self = .failed
         }
+    }
+
+    private static func makeContainer(for mode: PersistenceStoreMode) throws -> ModelContainer {
+        switch mode {
+        case .production:
+            try ModelContainerFactory.makeProduction()
+        case .localDevelopment:
+            try ModelContainerFactory.makeLocalDevelopment()
+        case .preview:
+            try ModelContainerFactory.makePreview()
+        }
+    }
+
+    private static func storeMode() -> PersistenceStoreMode {
+        let arguments = ProcessInfo.processInfo.arguments
+        let environment = ProcessInfo.processInfo.environment
+        if environment["XCTestConfigurationFilePath"] != nil || arguments.contains("-usePreviewStore") {
+            return .preview
+        }
+
+        #if targetEnvironment(simulator)
+        return .localDevelopment
+        #else
+        return .production
+        #endif
     }
 }
 
