@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		40198459694202BDD60F9E02 /* AppShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF468E89A0AFF7D4E13732C /* AppShell.swift */; };
+		53ECA5F1D5F9B2DEAA0407B2 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74F86E88F4662891FE8FB971 /* OnboardingView.swift */; };
 		64F0EE37580794A0954FD65D /* MomentumUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA1527FE381955F4E020EA6 /* MomentumUITests.swift */; };
 		72725C7A39900A6DBEE280EA /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D090D983103C774D1A79F13 /* ModelContainerFactory.swift */; };
 		8AAB50CFC88D10E3DE45A4E1 /* SchemaV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = E072B4895EE3EA2FDFA51B07 /* SchemaV1.swift */; };
@@ -16,6 +17,7 @@
 		B214406AE014943969EDE500 /* MomentumAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */; };
 		D23C4833E0D282C1A7673DE3 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3874E4291A3DB3650264F7E3 /* AppTab.swift */; };
 		DE0CA459D5E3EE1256248969 /* MomentumTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7316759B620D82328D71CB /* MomentumTheme.swift */; };
+		E3951258E29E40BC51AC2A2C /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 021AEB3CD665783BBE52CF25 /* SeedData.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,10 +38,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		021AEB3CD665783BBE52CF25 /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
 		1662D511CADD7FAE56F3A95E /* MomentumTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MomentumTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1B7316759B620D82328D71CB /* MomentumTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumTheme.swift; sourceTree = "<group>"; };
 		3874E4291A3DB3650264F7E3 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
 		422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumAppTests.swift; sourceTree = "<group>"; };
+		74F86E88F4662891FE8FB971 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		84BF7C2AB11F3A670B6DDC31 /* Momentum.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Momentum.entitlements; sourceTree = "<group>"; };
 		9D090D983103C774D1A79F13 /* ModelContainerFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContainerFactory.swift; sourceTree = "<group>"; };
 		A8DE35226C4BB5209ED75BB5 /* MomentumUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MomentumUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -88,11 +92,20 @@
 			children = (
 				CF0A01A0D0C38710467E5CE1 /* App */,
 				0E37BA673ADEC314AC412CEF /* Core */,
+				465FDAE7EBD421BE95EB701A /* Features */,
 				B60228F692B0231F197F01B2 /* Info.plist */,
 				84BF7C2AB11F3A670B6DDC31 /* Momentum.entitlements */,
 				AB577315C556F0E9D1FE31D7 /* MomentumApp.swift */,
 			);
 			path = Momentum;
+			sourceTree = "<group>";
+		};
+		465FDAE7EBD421BE95EB701A /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				F258EACC465431FF70CCFD1A /* Onboarding */,
+			);
+			path = Features;
 			sourceTree = "<group>";
 		};
 		6529FAE4B4BDC244F7DC1E66 /* Packages */ = {
@@ -116,6 +129,7 @@
 			children = (
 				9D090D983103C774D1A79F13 /* ModelContainerFactory.swift */,
 				E072B4895EE3EA2FDFA51B07 /* SchemaV1.swift */,
+				021AEB3CD665783BBE52CF25 /* SeedData.swift */,
 			);
 			path = Persistence;
 			sourceTree = "<group>";
@@ -154,6 +168,14 @@
 				CAA1527FE381955F4E020EA6 /* MomentumUITests.swift */,
 			);
 			path = MomentumUITests;
+			sourceTree = "<group>";
+		};
+		F258EACC465431FF70CCFD1A /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				74F86E88F4662891FE8FB971 /* OnboardingView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -273,7 +295,9 @@
 				72725C7A39900A6DBEE280EA /* ModelContainerFactory.swift in Sources */,
 				93CF080CC4587919A6C24D4D /* MomentumApp.swift in Sources */,
 				DE0CA459D5E3EE1256248969 /* MomentumTheme.swift in Sources */,
+				53ECA5F1D5F9B2DEAA0407B2 /* OnboardingView.swift in Sources */,
 				8AAB50CFC88D10E3DE45A4E1 /* SchemaV1.swift in Sources */,
+				E3951258E29E40BC51AC2A2C /* SeedData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

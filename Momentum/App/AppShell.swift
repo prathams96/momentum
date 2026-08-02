@@ -1,9 +1,19 @@
 import SwiftUI
+import SwiftData
 
 struct AppShell: View {
     @State private var selectedTab: AppTab = .today
+    @Query private var settings: [AppSettingsRecord]
 
     var body: some View {
+        if settings.first?.onboardingCompleted == true {
+            tabView
+        } else {
+            OnboardingView()
+        }
+    }
+
+    private var tabView: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
                 TodayPlaceholderView()

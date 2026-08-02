@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 @main
+@MainActor
 struct MomentumApp: App {
     private let bootstrap: PersistenceBootstrap
 
@@ -22,6 +23,7 @@ struct MomentumApp: App {
     }
 }
 
+@MainActor
 private enum PersistenceBootstrap {
     case ready(ModelContainer)
     case failed
@@ -30,7 +32,9 @@ private enum PersistenceBootstrap {
         let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         if isRunningTests || ProcessInfo.processInfo.arguments.contains("-usePreviewStore") {
             do {
-                self = .ready(try ModelContainerFactory.makePreview())
+                let container = try ModelContainerFactory.makePreview()
+                try SeedData.install(in: container.mainContext)
+                self = .ready(container)
             } catch {
                 self = .failed
             }
@@ -38,7 +42,9 @@ private enum PersistenceBootstrap {
         }
 
         do {
-            self = .ready(try ModelContainerFactory.makeProduction())
+            let container = try ModelContainerFactory.makeProduction()
+            try SeedData.install(in: container.mainContext)
+            self = .ready(container)
         } catch {
             self = .failed
         }
