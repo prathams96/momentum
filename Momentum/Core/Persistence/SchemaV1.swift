@@ -10,6 +10,10 @@ final class AppSettingsRecord {
     var domainDayCutoffMinutes: Int = 180
     var unitSystemRaw: String = "metric"
     var seedVersion: Int = 0
+    var calorieTarget: Int = 2400
+    var calorieMinimum: Int = 2300
+    var calorieMaximum: Int = 2500
+    var proteinMinimum: Int = 150
 
     init(
         id: UUID = UUID(),
@@ -18,7 +22,11 @@ final class AppSettingsRecord {
         onboardingCompleted: Bool = false,
         domainDayCutoffMinutes: Int = 180,
         unitSystemRaw: String = "metric",
-        seedVersion: Int = 0
+        seedVersion: Int = 0,
+        calorieTarget: Int = 2400,
+        calorieMinimum: Int = 2300,
+        calorieMaximum: Int = 2500,
+        proteinMinimum: Int = 150
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -27,6 +35,10 @@ final class AppSettingsRecord {
         self.domainDayCutoffMinutes = domainDayCutoffMinutes
         self.unitSystemRaw = unitSystemRaw
         self.seedVersion = seedVersion
+        self.calorieTarget = calorieTarget
+        self.calorieMinimum = calorieMinimum
+        self.calorieMaximum = calorieMaximum
+        self.proteinMinimum = proteinMinimum
     }
 }
 

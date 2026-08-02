@@ -16,7 +16,7 @@ struct AppShell: View {
     private var tabView: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                TodayPlaceholderView()
+                TodayView()
             }
             .tabItem {
                 Label(AppTab.today.title, systemImage: AppTab.today.symbol)
@@ -51,23 +51,6 @@ struct AppShell: View {
     }
 }
 
-private struct TodayPlaceholderView: View {
-    var body: some View {
-        ContentUnavailableView(
-            "Today is taking shape",
-            systemImage: "checklist",
-            description: Text("Your next workout, nutrition, and care routines will appear here.")
-        )
-        .navigationTitle("Today")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Settings", systemImage: "gearshape") {}
-                    .accessibilityLabel("Settings")
-            }
-        }
-    }
-}
-
 private struct PlaceholderTabView: View {
     let title: String
     let symbol: String
@@ -76,8 +59,16 @@ private struct PlaceholderTabView: View {
         ContentUnavailableView(
             title,
             systemImage: symbol,
-            description: Text("This area will be added in the next implementation stages.")
+            description: Text(description)
         )
         .navigationTitle(title)
+    }
+
+    private var description: String {
+        switch title {
+        case "History": "Completed days and the context around them will gather here."
+        case "Plans": "Tune your workout cycle, nutrition targets, and care routines here."
+        default: "Measurements, trends, and adherence will appear as you log your days."
+        }
     }
 }

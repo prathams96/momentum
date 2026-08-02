@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0C5205D600F7A38090084B6C /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518ECE49F1DC74E7E096DAF3 /* TodayView.swift */; };
 		40198459694202BDD60F9E02 /* AppShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF468E89A0AFF7D4E13732C /* AppShell.swift */; };
 		53ECA5F1D5F9B2DEAA0407B2 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74F86E88F4662891FE8FB971 /* OnboardingView.swift */; };
 		64F0EE37580794A0954FD65D /* MomentumUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA1527FE381955F4E020EA6 /* MomentumUITests.swift */; };
@@ -43,6 +44,7 @@
 		1B7316759B620D82328D71CB /* MomentumTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumTheme.swift; sourceTree = "<group>"; };
 		3874E4291A3DB3650264F7E3 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
 		422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumAppTests.swift; sourceTree = "<group>"; };
+		518ECE49F1DC74E7E096DAF3 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		74F86E88F4662891FE8FB971 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		84BF7C2AB11F3A670B6DDC31 /* Momentum.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Momentum.entitlements; sourceTree = "<group>"; };
 		9D090D983103C774D1A79F13 /* ModelContainerFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContainerFactory.swift; sourceTree = "<group>"; };
@@ -104,6 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				F258EACC465431FF70CCFD1A /* Onboarding */,
+				EA5D053652E058726BA65EED /* Today */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -160,6 +163,14 @@
 				3874E4291A3DB3650264F7E3 /* AppTab.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		EA5D053652E058726BA65EED /* Today */ = {
+			isa = PBXGroup;
+			children = (
+				518ECE49F1DC74E7E096DAF3 /* TodayView.swift */,
+			);
+			path = Today;
 			sourceTree = "<group>";
 		};
 		EB4C2A3173F8AE1BD069B580 /* MomentumUITests */ = {
@@ -298,6 +309,7 @@
 				53ECA5F1D5F9B2DEAA0407B2 /* OnboardingView.swift in Sources */,
 				8AAB50CFC88D10E3DE45A4E1 /* SchemaV1.swift in Sources */,
 				E3951258E29E40BC51AC2A2C /* SeedData.swift in Sources */,
+				0C5205D600F7A38090084B6C /* TodayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
