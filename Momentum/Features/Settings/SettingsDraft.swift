@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 struct SettingsDraft: Equatable {
     var domainDayCutoffMinutes: Int
@@ -108,6 +109,16 @@ enum AppearanceOption: String, CaseIterable, Identifiable {
         case .system: "System"
         case .light: "Light"
         case .dark: "Dark"
+        }
+    }
+}
+
+enum AppearanceResolver {
+    static func colorScheme(for rawValue: String) -> ColorScheme? {
+        switch AppearanceOption(rawValue: rawValue) ?? .system {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
         }
     }
 }

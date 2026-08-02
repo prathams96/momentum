@@ -1,3 +1,4 @@
+import MomentumCore
 import SwiftData
 import SwiftUI
 import UIKit
@@ -34,7 +35,7 @@ struct SettingsView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
-                    saveSettings()
+                    requestSaveSettings()
                 }
                 .disabled(settings == nil || savedDraft == draft || isSaving)
             }
@@ -49,13 +50,26 @@ struct SettingsView: View {
                 Alert(
                     title: Text("Couldn’t save settings"),
                     message: Text("Your changes are still here. Try saving again."),
-                    primaryButton: .default(Text("Retry"), action: saveSettings),
+                    primaryButton: .default(Text("Retry"), action: persistSettings),
                     secondaryButton: .cancel()
+                )
+            case .confirmCutoffChange:
+                Alert(
+                    title: Text("Change Domain Day cutoff?"),
+                    message: Text(cutoffChangeMessage),
+                    primaryButton: .default(Text("Change cutoff"), action: persistSettings),
+                    secondaryButton: .cancel(Text("Keep current cutoff"))
                 )
             case .exportFailed:
                 Alert(
                     title: Text("Couldn’t prepare export"),
                     message: Text("Your data is unchanged. Try preparing the CSV files again."),
+                    dismissButton: .default(Text("OK"))
+                )
+            case .reminderRefreshFailed:
+                Alert(
+                    title: Text("Settings saved"),
+                    message: Text("Reminder delivery could not be refreshed. Momentum will try again when the app becomes active."),
                     dismissButton: .default(Text("OK"))
                 )
             }
@@ -89,6 +103,11 @@ struct SettingsView: View {
                 Text(detail)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+
+            if let schedulingStatusTitle {
+                LabeledContent("Reminder scheduling", value: schedulingStatusTitle)
+                    .foregroundStyle(settings?.notificationSchedulingStatusRaw == "failed" ? .orange : .secondary)
             }
         } header: {
             Text("Status")
@@ -191,7 +210,7 @@ struct SettingsView: View {
     }
 
     private var settings: AppSettingsRecord? {
-        settingsRecords.max { $0.updatedAt < $1.updatedAt }
+        AppSettingsRecord.canonical(in: settingsRecords)
     }
 
     private var activeRoutines: [CareRoutineTemplateRecord] {
@@ -227,7 +246,35 @@ struct SettingsView: View {
         savedDraft = loadedDraft
     }
 
-    private func saveSettings() {
+    private var schedulingStatusTitle: String? {
+        switch settings?.notificationSchedulingStatusRaw {
+        case "healthy": "Up to date"
+        case "failed": "Needs retry"
+        default: nil
+        }
+    }
+
+    private var cutoffChangeMessage: String {
+        let previous = savedDraft?.domainDayCutoffMinutes ?? settings?.domainDayCutoffMinutes ?? 180
+        let next = draft.domainDayCutoffMinutes
+        let oldDay = DomainDay.containing(.now, calendar: .autoupdatingCurrent, cutoffMinutes: previous)
+        let newDay = DomainDay.containing(.now, calendar: .autoupdatingCurrent, cutoffMinutes: next)
+        let attribution = oldDay == newDay
+            ? "Today remains \(PersistedDomainDay.encode(newDay))."
+            : "The current moment moves from \(PersistedDomainDay.encode(oldDay)) to \(PersistedDomainDay.encode(newDay))."
+        return "The cutoff will change from \(formattedTime(previous)) to \(formattedTime(next)). \(attribution) Recent history, streaks, and reminders will be recalculated."
+    }
+
+    private func requestSaveSettings() {
+        if let savedDraft,
+           savedDraft.domainDayCutoffMinutes != draft.domainDayCutoffMinutes {
+            presentedAlert = .confirmCutoffChange
+        } else {
+            persistSettings()
+        }
+    }
+
+    private func persistSettings() {
         guard let settings else { return }
         isSaving = true
         draft.apply(to: settings, routines: activeRoutines)
@@ -235,7 +282,10 @@ struct SettingsView: View {
             try modelContext.save()
             savedDraft = draft
             isSaving = false
-            Task { try? await DailyReconciler.reconcileAndNotify(in: modelContext) }
+            Task {
+                do { try await DailyReconciler.reconcileAndNotify(in: modelContext) }
+                catch { presentedAlert = .reminderRefreshFailed }
+            }
         } catch {
             modelContext.rollback()
             isSaving = false
@@ -363,6 +413,8 @@ private struct ResetAllDataSheet: View {
 private enum SettingsAlert: String, Identifiable {
     case saveFailed
     case exportFailed
+    case reminderRefreshFailed
+    case confirmCutoffChange
 
     var id: String { rawValue }
 }

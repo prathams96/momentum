@@ -16,6 +16,7 @@ final class AppSettingsRecord {
     var eveningCareNotificationMinutes: Int = 22 * 60
     var nutritionReminderMinutes: Int = 22 * 60
     var notificationAuthorizationRaw: String = "notDetermined"
+    var notificationSchedulingStatusRaw: String = "unknown"
     var iCloudStatusRaw: String = "unknown"
     var iCloudStatusUpdatedAt: Date?
     var lastSuccessfulSyncAt: Date?
@@ -39,6 +40,7 @@ final class AppSettingsRecord {
         eveningCareNotificationMinutes: Int = 22 * 60,
         nutritionReminderMinutes: Int = 22 * 60,
         notificationAuthorizationRaw: String = "notDetermined",
+        notificationSchedulingStatusRaw: String = "unknown",
         iCloudStatusRaw: String = "unknown",
         iCloudStatusUpdatedAt: Date? = nil,
         lastSuccessfulSyncAt: Date? = nil,
@@ -61,6 +63,7 @@ final class AppSettingsRecord {
         self.eveningCareNotificationMinutes = eveningCareNotificationMinutes
         self.nutritionReminderMinutes = nutritionReminderMinutes
         self.notificationAuthorizationRaw = notificationAuthorizationRaw
+        self.notificationSchedulingStatusRaw = notificationSchedulingStatusRaw
         self.iCloudStatusRaw = iCloudStatusRaw
         self.iCloudStatusUpdatedAt = iCloudStatusUpdatedAt
         self.lastSuccessfulSyncAt = lastSuccessfulSyncAt
@@ -69,6 +72,17 @@ final class AppSettingsRecord {
         self.calorieMinimum = calorieMinimum
         self.calorieMaximum = calorieMaximum
         self.proteinMinimum = proteinMinimum
+    }
+}
+
+extension AppSettingsRecord {
+    /// Selects the same settings record everywhere, including when CloudKit briefly
+    /// presents duplicate singleton records during conflict resolution.
+    static func canonical(in records: [AppSettingsRecord]) -> AppSettingsRecord? {
+        records.max {
+            if $0.updatedAt != $1.updatedAt { return $0.updatedAt < $1.updatedAt }
+            return $0.id.uuidString < $1.id.uuidString
+        }
     }
 }
 
@@ -176,6 +190,7 @@ final class ExercisePrescriptionRecord {
     var rirMaximum: Int?
     var notes: String = ""
     var loadIncrementKg: Double = 1
+    var workingWeightKg: Double = 0
     var isOptional: Bool = false
     var isArchived: Bool = false
     var createdAt: Date = Foundation.Date()
@@ -194,6 +209,7 @@ final class ExercisePrescriptionRecord {
         rirMaximum: Int? = nil,
         notes: String = "",
         loadIncrementKg: Double = 1,
+        workingWeightKg: Double = 0,
         isOptional: Bool = false,
         isArchived: Bool = false,
         createdAt: Date = .now,
@@ -211,6 +227,7 @@ final class ExercisePrescriptionRecord {
         self.rirMaximum = rirMaximum
         self.notes = notes
         self.loadIncrementKg = loadIncrementKg
+        self.workingWeightKg = workingWeightKg
         self.isOptional = isOptional
         self.isArchived = isArchived
         self.createdAt = createdAt
@@ -585,6 +602,7 @@ final class ExerciseAlternativeRecord {
 final class CareRoutineTemplateRecord {
     var id: UUID = UUID()
     var name: String = ""
+    var routineRoleRaw: String = "custom"
     var categoryRaw: String = "personalCare"
     var recurrenceKindRaw: String = "weekdaySet"
     var recurrencePayload: String = ""
@@ -597,6 +615,7 @@ final class CareRoutineTemplateRecord {
     init(
         id: UUID = UUID(),
         name: String,
+        routineRoleRaw: String = "custom",
         categoryRaw: String = "personalCare",
         recurrenceKindRaw: String = "weekdaySet",
         recurrencePayload: String,
@@ -608,6 +627,7 @@ final class CareRoutineTemplateRecord {
     ) {
         self.id = id
         self.name = name
+        self.routineRoleRaw = routineRoleRaw
         self.categoryRaw = categoryRaw
         self.recurrenceKindRaw = recurrenceKindRaw
         self.recurrencePayload = recurrencePayload
@@ -668,6 +688,8 @@ final class CareOccurrenceRecord {
     var id: UUID = UUID()
     var routineTemplateID: UUID?
     var routineNameSnapshot: String = ""
+    var routineRoleRaw: String = "custom"
+    var sourceWorkoutSessionID: UUID?
     var dueDomainDay: String = ""
     var dueAt: Date = Foundation.Date()
     var statusRaw: String = "pending"
@@ -682,6 +704,8 @@ final class CareOccurrenceRecord {
         id: UUID = UUID(),
         routineTemplateID: UUID? = nil,
         routineNameSnapshot: String,
+        routineRoleRaw: String = "custom",
+        sourceWorkoutSessionID: UUID? = nil,
         dueDomainDay: String,
         dueAt: Date,
         statusRaw: String = "pending",
@@ -695,6 +719,8 @@ final class CareOccurrenceRecord {
         self.id = id
         self.routineTemplateID = routineTemplateID
         self.routineNameSnapshot = routineNameSnapshot
+        self.routineRoleRaw = routineRoleRaw
+        self.sourceWorkoutSessionID = sourceWorkoutSessionID
         self.dueDomainDay = dueDomainDay
         self.dueAt = dueAt
         self.statusRaw = statusRaw

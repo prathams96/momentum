@@ -3,137 +3,290 @@ import SwiftData
 import SwiftUI
 
 struct HistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+
+    @Query private var settings: [AppSettingsRecord]
+    @Query private var workouts: [WorkoutTemplateRecord]
+    @Query private var anchors: [CycleAnchorRecord]
     @Query private var sessions: [WorkoutSessionRecord]
     @Query private var workoutEvents: [WorkoutDayEventRecord]
     @Query private var nutritionDays: [NutritionDayRecord]
+    @Query private var foodEntries: [FoodEntryRecord]
     @Query private var careOccurrences: [CareOccurrenceRecord]
+    @Query private var measurements: [BodyMeasurementRecord]
 
-    private var days: [DomainDay] {
-        let values = sessions.compactMap { PersistedDomainDay.decode($0.completionDomainDay ?? $0.scheduledDomainDay) }
-            + workoutEvents.compactMap { PersistedDomainDay.decode($0.domainDay) }
-            + nutritionDays.compactMap { PersistedDomainDay.decode($0.domainDay) }
-            + careOccurrences.compactMap { PersistedDomainDay.decode($0.dueDomainDay) }
-        return Array(Set(values)).sorted(by: >)
+    @State private var category: HistoryCategory = .all
+    @State private var heatmapPage = 0
+    @State private var presentedSheet: HistorySheetDestination?
+    @State private var pendingDeletion: HistoryDeletionRequest?
+    @State private var lastDeletion: HistoryDeletionRequest?
+    @State private var correctionError: String?
+
+    private let calendar = Calendar.autoupdatingCurrent
+
+    private var today: DomainDay {
+        ScheduleProjection.currentDomainDay(
+            settings: settings,
+            now: .now,
+            calendar: calendar
+        )
+    }
+
+    private var adherenceFacts: [HistoryAdherenceFact] {
+        HistoryProjection.facts(
+            sessions: sessions,
+            workoutEvents: workoutEvents,
+            nutritionDays: nutritionDays,
+            careOccurrences: careOccurrences
+        )
+    }
+
+    private var filteredDays: [DomainDay] {
+        let sessionDays: [DomainDay] = category.includes(.workouts)
+            ? sessions.compactMap { session in
+                guard session.deletedAt == nil else { return nil }
+                return PersistedDomainDay.decode(
+                    session.completionDomainDay ?? session.scheduledDomainDay
+                )
+            }
+            : []
+        let eventDays: [DomainDay] = category.includes(.workouts)
+            ? workoutEvents.compactMap {
+                $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
+            }
+            : []
+        let nutritionFactDays: [DomainDay] = category.includes(.nutrition)
+            ? nutritionDays.compactMap { PersistedDomainDay.decode($0.domainDay) }
+                + foodEntries.compactMap {
+                    $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
+                }
+            : []
+        let careDays: [DomainDay] = category.includes(.care)
+            ? careOccurrences.compactMap { PersistedDomainDay.decode($0.dueDomainDay) }
+            : []
+        let measurementDays: [DomainDay] = category.includes(.measurements)
+            ? measurements.compactMap {
+                $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
+            }
+            : []
+
+        var days = Set<DomainDay>()
+        days.formUnion(sessionDays)
+        days.formUnion(eventDays)
+        days.formUnion(nutritionFactDays)
+        days.formUnion(careDays)
+        days.formUnion(measurementDays)
+        return days.sorted(by: >)
+    }
+
+    private var streaks: HistoryStreakSummary {
+        HistoryProjection.streaks(facts: adherenceFacts, calendar: calendar)
     }
 
     var body: some View {
-        Group {
-            if days.isEmpty {
-                ContentUnavailableView(
-                    "No history yet",
-                    systemImage: "calendar",
-                    description: Text("Completed workouts, nutrition days, and care routines will appear here.")
-                )
-            } else {
-                List(days, id: \.self) { day in
-                    NavigationLink(value: day) {
-                        HistoryDayRow(
-                            day: day,
-                            sessions: sessions,
-                            workoutEvents: workoutEvents,
-                            nutritionDays: nutritionDays,
-                            careOccurrences: careOccurrences
-                        )
+        List {
+            Section {
+                Picker("Category", selection: $category) {
+                    ForEach(HistoryCategory.allCases) { option in
+                        Text(option.title).tag(option)
                     }
                 }
-                .navigationDestination(for: DomainDay.self) { day in
-                    HistoryDayDetail(
-                        day: day,
-                        sessions: sessions,
-                        workoutEvents: workoutEvents,
-                        nutritionDays: nutritionDays,
-                        careOccurrences: careOccurrences
+                .pickerStyle(.menu)
+                .accessibilityHint("Filters the heatmap and chronological history")
+
+                HistoryHeatmapView(
+                    currentDay: today,
+                    page: $heatmapPage,
+                    calendar: calendar
+                ) { day in
+                    HistoryProjection.adherenceScore(
+                        on: day,
+                        facts: adherenceFacts,
+                        category: category
                     )
+                }
+
+                HistoryStreakSummaryView(summary: streaks, category: category)
+            }
+
+            if filteredDays.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        "No \(category.title.lowercased()) history",
+                        systemImage: "calendar",
+                        description: Text("Completed activities and logged facts will appear here.")
+                    )
+                }
+            } else {
+                ForEach(filteredDays, id: \.self) { day in
+                    Section {
+                        NavigationLink(value: day) {
+                            HistoryDayRow(
+                                day: day,
+                                category: category,
+                                sessions: sessions,
+                                workoutEvents: workoutEvents,
+                                nutritionDays: nutritionDays,
+                                foodEntries: foodEntries,
+                                careOccurrences: careOccurrences,
+                                measurements: measurements
+                            )
+                        }
+                    }
                 }
             }
         }
         .navigationTitle("History")
-    }
-}
-
-private struct HistoryDayRow: View {
-    let day: DomainDay
-    let sessions: [WorkoutSessionRecord]
-    let workoutEvents: [WorkoutDayEventRecord]
-    let nutritionDays: [NutritionDayRecord]
-    let careOccurrences: [CareOccurrenceRecord]
-
-    private var dayKey: String { PersistedDomainDay.encode(day) }
-    private var workoutLabel: String {
-        if sessions.contains(where: { $0.completionDomainDay == dayKey }) { return "Workout finished" }
-        if workoutEvents.contains(where: { $0.domainDay == dayKey && $0.kindRaw == "skipped" }) { return "Workout skipped" }
-        if workoutEvents.contains(where: { $0.domainDay == dayKey && $0.kindRaw == "missed" }) { return "Workout missed" }
-        return "No workout"
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
-            Text(day.foundationDate.formatted(date: .abbreviated, time: .omitted))
-                .font(.headline)
-            Text(workoutLabel)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            HStack(spacing: MomentumSpacing.sm) {
-                Label(nutritionDays.contains(where: { $0.domainDay == dayKey && $0.finalizedAt != nil }) ? "Nutrition done" : "Nutrition open", systemImage: "fork.knife")
-                Label("\(careOccurrences.filter { $0.dueDomainDay == dayKey && $0.statusRaw == "completed" }.count) care", systemImage: "sparkles")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        .navigationDestination(for: DomainDay.self) { day in
+            HistoryDayDetail(
+                day: day,
+                category: category,
+                sessions: sessions,
+                workoutEvents: workoutEvents,
+                nutritionDays: nutritionDays,
+                foodEntries: foodEntries,
+                careOccurrences: careOccurrences,
+                measurements: measurements,
+                editFood: { entry in
+                    presentedSheet = .editFood(id: entry.id, domainDay: entry.domainDay)
+                },
+                backdateFood: { entry in
+                    presentedSheet = .backdate(.food(id: entry.id, currentDay: entry.domainDay))
+                },
+                backdateMeasurement: { measurement in
+                    presentedSheet = .backdate(.measurement(
+                        id: measurement.id,
+                        currentDay: measurement.domainDay
+                    ))
+                },
+                requestFoodDeletion: { pendingDeletion = .food(id: $0.id) },
+                requestMeasurementDeletion: { pendingDeletion = .measurement(id: $0.id) },
+                requestWorkoutDeletion: requestWorkoutDeletion
+            )
         }
-        .padding(.vertical, MomentumSpacing.xs)
-    }
-}
-
-private struct HistoryDayDetail: View {
-    @Environment(\.modelContext) private var modelContext
-    let day: DomainDay
-    let sessions: [WorkoutSessionRecord]
-    let workoutEvents: [WorkoutDayEventRecord]
-    let nutritionDays: [NutritionDayRecord]
-    let careOccurrences: [CareOccurrenceRecord]
-
-    private var dayKey: String { PersistedDomainDay.encode(day) }
-
-    var body: some View {
-        List {
-            Section("Workout") {
-                ForEach(sessions.filter { ($0.completionDomainDay ?? $0.scheduledDomainDay) == dayKey }) { session in
-                    VStack(alignment: .leading) {
-                        Text(session.workoutNameSnapshot)
-                        Text(session.finishedAt.map { "Finished \($0.formatted(date: .omitted, time: .shortened))" } ?? "Started, not finished")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                ForEach(workoutEvents.filter { $0.domainDay == dayKey }) { event in
-                    Label(event.kindRaw.capitalized, systemImage: event.kindRaw == "missed" ? "xmark.circle" : "forward.circle")
-                }
-            }
-            Section("Nutrition") {
-                if let dayRecord = nutritionDays.first(where: { $0.domainDay == dayKey }) {
-                    Label(dayRecord.finalizedAt == nil ? "Still open" : "Finalized", systemImage: dayRecord.finalizedAt == nil ? "circle" : "checkmark.circle.fill")
-                } else {
-                    Text("No nutrition log")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Section("Care") {
-                ForEach(careOccurrences.filter { $0.dueDomainDay == dayKey }) { occurrence in
-                    HStack {
-                        Text(occurrence.routineNameSnapshot)
-                        Spacer()
-                        Text(occurrence.statusRaw.capitalized)
-                            .foregroundStyle(occurrence.statusRaw == "completed" ? MomentumTheme.success : .secondary)
-                    }
+        .toolbar {
+            if lastDeletion != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Undo", action: undoLastDeletion)
+                        .accessibilityHint("Restores the most recently deleted history record")
                 }
             }
         }
-        .navigationTitle(day.foundationDate.formatted(date: .abbreviated, time: .omitted))
+        .sheet(item: $presentedSheet, onDismiss: reconcileHistory) { destination in
+            switch destination {
+            case let .editFood(id, domainDay):
+                FoodEntrySheet(domainDay: domainDay, existingEntryID: id)
+            case let .backdate(target):
+                HistoryBackdateSheet(target: target)
+            }
+        }
+        .confirmationDialog(
+            pendingDeletion?.title ?? "Delete history?",
+            isPresented: Binding(
+                get: { pendingDeletion != nil },
+                set: { if !$0 { pendingDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDeletion
+        ) { deletion in
+            Button("Delete", role: .destructive) {
+                performDeletion(deletion)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { deletion in
+            Text(deletion.message)
+        }
+        .alert("History couldn’t be refreshed", isPresented: Binding(
+            get: { correctionError != nil },
+            set: { if !$0 { correctionError = nil } }
+        )) {
+            Button("Retry", action: reconcileHistory)
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(correctionError ?? "The correction was saved. Try refreshing again.")
+        }
+    }
+
+    private func requestWorkoutDeletion(_ session: WorkoutSessionRecord) {
+        let preview = HistoryCorrectionProjection.workoutDeletionPreview(
+            sessionID: session.id,
+            workouts: workouts,
+            anchors: anchors,
+            sessions: sessions,
+            settings: settings,
+            now: .now,
+            calendar: calendar
+        )
+        pendingDeletion = .workout(id: session.id, preview: preview)
+    }
+
+    private func performDeletion(_ deletion: HistoryDeletionRequest) {
+        let changed: Bool
+        switch deletion {
+        case let .food(id):
+            guard let record = foodEntries.first(where: { $0.id == id }) else { return }
+            record.deletedAt = .now
+            record.updatedAt = .now
+            changed = true
+        case let .measurement(id):
+            guard let record = measurements.first(where: { $0.id == id }) else { return }
+            record.deletedAt = .now
+            record.updatedAt = .now
+            changed = true
+        case let .workout(id, _):
+            guard let record = sessions.first(where: { $0.id == id }) else { return }
+            record.deletedAt = .now
+            record.updatedAt = .now
+            changed = true
+        }
+
+        guard changed else { return }
+        do {
+            try modelContext.save()
+            lastDeletion = deletion
+            pendingDeletion = nil
+            reconcileHistory()
+        } catch {
+            correctionError = "The record is still visible because the deletion could not be saved."
+        }
+    }
+
+    private func undoLastDeletion() {
+        guard let deletion = lastDeletion else { return }
+        switch deletion {
+        case let .food(id):
+            foodEntries.first(where: { $0.id == id })?.deletedAt = nil
+        case let .measurement(id):
+            measurements.first(where: { $0.id == id })?.deletedAt = nil
+        case let .workout(id, _):
+            sessions.first(where: { $0.id == id })?.deletedAt = nil
+        }
+
+        do {
+            try modelContext.save()
+            lastDeletion = nil
+            reconcileHistory()
+        } catch {
+            correctionError = "The record could not be restored. Try again."
+        }
+    }
+
+    private func reconcileHistory() {
+        Task { @MainActor in
+            do {
+                try await DailyReconciler.reconcileAndNotify(
+                    in: modelContext,
+                    calendar: calendar
+                )
+            } catch {
+                correctionError = "The correction was saved, but schedules and reminders could not be refreshed."
+            }
+        }
     }
 }
 
-private extension DomainDay {
-    var foundationDate: Date {
-        PersistedDomainDay.date(for: self, calendar: .autoupdatingCurrent) ?? .now
+private extension HistoryCategory {
+    func includes(_ category: HistoryCategory) -> Bool {
+        self == .all || self == category
     }
 }

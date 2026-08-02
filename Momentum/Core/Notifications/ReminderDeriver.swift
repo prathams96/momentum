@@ -18,7 +18,7 @@ enum ReminderDeriver {
         )
         var reminders: [ScheduledReminder] = []
 
-        if case let .due(workoutID, dueDay, _) = scheduleState,
+        if case let .due(workoutID, _, _) = scheduleState,
            let settings,
            let date = reminderDate(
                for: currentDay,
@@ -27,7 +27,7 @@ enum ReminderDeriver {
                calendar: calendar
            ) {
             reminders.append(ScheduledReminder(
-                identifier: "workout.\(workoutID.uuidString).\(PersistedDomainDay.encode(dueDay))",
+                identifier: "workout.\(workoutID.uuidString).\(PersistedDomainDay.encode(currentDay))",
                 title: "Workout due",
                 body: "Your next workout is ready when you are.",
                 categoryIdentifier: MomentumNotificationCategory.workoutDue,
@@ -35,7 +35,7 @@ enum ReminderDeriver {
                 userInfo: [
                     "kind": "workoutDue",
                     "workoutID": workoutID.uuidString,
-                    "domainDay": PersistedDomainDay.encode(dueDay)
+                    "domainDay": PersistedDomainDay.encode(currentDay)
                 ]
             ))
         }
@@ -43,7 +43,14 @@ enum ReminderDeriver {
         let dueCare = occurrences
             .filter { $0.dueDomainDay == PersistedDomainDay.encode(currentDay) && $0.statusRaw == "pending" }
             .sorted { ($0.dueAt, $0.id.uuidString) < ($1.dueAt, $1.id.uuidString) }
-        for occurrence in dueCare where occurrence.dueAt > now {
+        let nutritionOpen = nutritionDay?.finalizedAt == nil
+        let nutritionMinutes = settings?.nutritionReminderMinutes ?? 22 * 60
+        let coalescedNightCare = nutritionOpen ? dueCare.filter {
+            $0.routineRoleRaw == "night" && minutesSinceMidnight($0.dueAt, calendar: calendar) == nutritionMinutes
+        } : []
+        let coalescedOccurrenceIDs = Set(coalescedNightCare.map(\.id))
+
+        for occurrence in dueCare where occurrence.dueAt > now && !coalescedOccurrenceIDs.contains(occurrence.id) {
             reminders.append(ScheduledReminder(
                 identifier: "care.\(occurrence.id.uuidString)",
                 title: occurrence.routineNameSnapshot,
@@ -58,28 +65,34 @@ enum ReminderDeriver {
             ))
         }
 
-        let nutritionOpen = nutritionDay?.finalizedAt == nil
-        let nightCareDue = dueCare.contains { $0.routineNameSnapshot.hasPrefix("Night care") }
-        if nutritionOpen || nightCareDue {
-            let minutes = settings?.nutritionReminderMinutes ?? 22 * 60
-            if let date = reminderDate(for: currentDay, minutes: minutes, now: now, calendar: calendar) {
+        if nutritionOpen {
+            if let date = reminderDate(for: currentDay, minutes: nutritionMinutes, now: now, calendar: calendar) {
+                var userInfo = [
+                    "kind": "eveningCheckIn",
+                    "domainDay": PersistedDomainDay.encode(currentDay)
+                ]
+                if let occurrence = coalescedNightCare.first {
+                    userInfo["occurrenceID"] = occurrence.id.uuidString
+                }
                 reminders.append(ScheduledReminder(
                     identifier: "evening.\(PersistedDomainDay.encode(currentDay))",
                     title: "Evening check-in",
-                    body: nutritionOpen && nightCareDue
+                    body: !coalescedNightCare.isEmpty
                         ? "Finish logging food and check your night care routine."
-                        : nutritionOpen ? "Finish logging today’s food." : "Check your night care routine.",
+                        : "Finish logging today’s food.",
                     categoryIdentifier: MomentumNotificationCategory.eveningCheckIn,
                     dateComponents: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date),
-                    userInfo: [
-                        "kind": "eveningCheckIn",
-                        "domainDay": PersistedDomainDay.encode(currentDay)
-                    ]
+                    userInfo: userInfo
                 ))
             }
         }
 
         return reminders
+    }
+
+    private static func minutesSinceMidnight(_ date: Date, calendar: Calendar) -> Int {
+        let components = calendar.dateComponents([.hour, .minute], from: date)
+        return (components.hour ?? 0) * 60 + (components.minute ?? 0)
     }
 
     private static func reminderDate(

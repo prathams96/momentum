@@ -20,6 +20,14 @@ private enum FoodEntryDestination: Identifiable {
     }
 }
 
+private struct EarlyStartRequest: Identifiable {
+    let workoutID: UUID
+    let eligibleDay: DomainDay
+    let daysRemaining: Int
+
+    var id: UUID { workoutID }
+}
+
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settings: [AppSettingsRecord]
@@ -27,6 +35,7 @@ struct TodayView: View {
     @Query(sort: \WorkoutTemplateRecord.sequenceIndex) private var workouts: [WorkoutTemplateRecord]
     @Query private var exercises: [ExercisePrescriptionRecord]
     @Query private var sessions: [WorkoutSessionRecord]
+    @Query private var workoutEvents: [WorkoutDayEventRecord]
     @Query private var occurrences: [CareOccurrenceRecord]
     @Query private var foodEntries: [FoodEntryRecord]
     @Query private var nutritionDays: [NutritionDayRecord]
@@ -38,8 +47,14 @@ struct TodayView: View {
     @State private var startError: String?
     @State private var reconciliationError: String?
     @State private var nutritionError: String?
+    @State private var pendingEarlyStart: EarlyStartRequest?
 
     private let calendar = Calendar.autoupdatingCurrent
+    @Binding private var notificationWorkoutRoute: WorkoutNotificationRoute?
+
+    init(notificationWorkoutRoute: Binding<WorkoutNotificationRoute?> = .constant(nil)) {
+        _notificationWorkoutRoute = notificationWorkoutRoute
+    }
 
     private var currentDomainDay: DomainDay {
         ScheduleProjection.currentDomainDay(settings: settings, now: .now, calendar: calendar)
@@ -84,7 +99,24 @@ struct TodayView: View {
         return id.flatMap { workoutID in workouts.first { $0.id == workoutID } }
     }
 
+    private var adherenceFacts: [HistoryAdherenceFact] {
+        HistoryProjection.facts(
+            sessions: sessions,
+            workoutEvents: workoutEvents,
+            nutritionDays: nutritionDays,
+            careOccurrences: occurrences
+        )
+    }
+
+    private var adherenceStreaks: HistoryStreakSummary {
+        HistoryProjection.streaks(facts: adherenceFacts, calendar: calendar)
+    }
+
     var body: some View {
+        alertContent
+    }
+
+    private var mainContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: MomentumSpacing.xxl) {
                 dateLine
@@ -117,6 +149,13 @@ struct TodayView: View {
                 reconciliationError = "Today’s reminders could not be refreshed. Try again in a moment."
             }
         }
+        .onChange(of: notificationWorkoutRoute) { _, route in
+            handleNotificationRoute(route)
+        }
+    }
+
+    private var presentationContent: some View {
+        mainContent
         .fullScreenCover(isPresented: Binding(
             get: { presentedSessionID != nil },
             set: { if !$0 { presentedSessionID = nil } }
@@ -124,7 +163,7 @@ struct TodayView: View {
             if let sessionID = presentedSessionID {
                 WorkoutSessionView(
                     sessionID: sessionID,
-                    domainDayCutoffMinutes: settings.max(by: { $0.updatedAt < $1.updatedAt })?.domainDayCutoffMinutes ?? 180
+                    domainDayCutoffMinutes: AppSettingsRecord.canonical(in: settings)?.domainDayCutoffMinutes ?? 180
                 )
             }
         }
@@ -142,6 +181,10 @@ struct TodayView: View {
                 CareRoutineSheet(occurrenceID: occurrenceID)
             }
         }
+    }
+
+    private var alertContent: some View {
+        presentationContent
         .alert("Couldn’t start workout", isPresented: Binding(
             get: { startError != nil },
             set: { if !$0 { startError = nil } }
@@ -166,6 +209,39 @@ struct TodayView: View {
         } message: {
             Text(nutritionError ?? "Your food entries are still safe.")
         }
+        .alert(item: $pendingEarlyStart) { request in
+            Alert(
+                title: Text("Start during recovery?"),
+                message: Text(earlyStartMessage(request)),
+                primaryButton: .default(Text("Start early")) {
+                    handleEarlyStart(request)
+                },
+                secondaryButton: .cancel(Text("Keep recovering"))
+            )
+        }
+    }
+
+    private func handleEarlyStart(_ request: EarlyStartRequest) {
+        guard let workout = workouts.first(where: { $0.id == request.workoutID }) else {
+            startError = "That workout is no longer available in the current plan."
+            return
+        }
+        start(workout: workout, scheduledDay: request.eligibleDay)
+    }
+
+    private func handleNotificationRoute(_ route: WorkoutNotificationRoute?) {
+        guard let route else { return }
+        notificationWorkoutRoute = nil
+        guard let workout = workouts.first(where: { $0.id == route.workoutID }) else {
+            startError = "That workout is no longer available in the current plan."
+            return
+        }
+        start(workout: workout, scheduledDay: route.domainDay)
+    }
+
+    private func earlyStartMessage(_ request: EarlyStartRequest) -> String {
+        let noun = request.daysRemaining == 1 ? "day" : "days"
+        return "Your plan has \(request.daysRemaining) recovery \(noun) remaining. Starting now is allowed, and future recovery will use the day you finish."
     }
 
     private var dateLine: some View {
@@ -208,7 +284,13 @@ struct TodayView: View {
                         title: "Recovery · \(daysRemaining) day\(daysRemaining == 1 ? "" : "s") left",
                         detail: "You can start early if today feels right.",
                         buttonTitle: "Start early",
-                        action: { start(workout: workout, scheduledDay: eligibleDay) }
+                        action: {
+                            pendingEarlyStart = EarlyStartRequest(
+                                workoutID: workout.id,
+                                eligibleDay: eligibleDay,
+                                daysRemaining: daysRemaining
+                            )
+                        }
                     )
                 } else {
                     repairCard
@@ -302,6 +384,15 @@ struct TodayView: View {
                 careButton(for: nightOccurrence, fallbackTitle: "Night care", symbol: "moon", detail: "Current weekday routine")
                 Divider().padding(.leading, 52)
                 careButton(for: hairOccurrence, fallbackTitle: "Hair care", symbol: "drop", detail: "Alternating routine")
+                ForEach(postWorkoutOccurrences) { occurrence in
+                    Divider().padding(.leading, 52)
+                    careButton(
+                        for: occurrence,
+                        fallbackTitle: "Post-workout care",
+                        symbol: "figure.cooldown",
+                        detail: "Added after today’s workout"
+                    )
+                }
             }
         }
     }
@@ -363,8 +454,8 @@ struct TodayView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(activeFoodEntries) { entry in
-                    Button { openFoodEntry(entry.id) } label: {
-                        HStack {
+                    HStack {
+                        Button { openFoodEntry(entry.id) } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(entry.nameSnapshot).font(.headline)
                                 Text("\(DecimalFormatter.whole(entry.totalCalories)) kcal · \(DecimalFormatter.onePlace(entry.totalProteinGrams)) g protein")
@@ -376,18 +467,17 @@ struct TodayView: View {
                                 .font(.subheadline.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
-                    }
-                    .buttonStyle(.plain)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) { deleteFoodEntry(entry) } label: {
-                            Label("Delete", systemImage: "trash")
+                        .buttonStyle(.plain)
+
+                        Menu {
+                            Button("Edit", systemImage: "pencil") { openFoodEntry(entry.id) }
+                            Button("Duplicate", systemImage: "plus.square.on.square") { duplicateFoodEntry(entry) }
+                            Button("Delete", systemImage: "trash", role: .destructive) { deleteFoodEntry(entry) }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .frame(width: 44, height: 44)
                         }
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        Button { duplicateFoodEntry(entry) } label: {
-                            Label("Duplicate", systemImage: "plus.square.on.square")
-                        }
-                        .tint(MomentumTheme.pulse)
+                        .accessibilityLabel("Actions for \(entry.nameSnapshot)")
                     }
                 }
             }
@@ -454,14 +544,20 @@ struct TodayView: View {
             totalProteinGrams: entry.totalProteinGrams
         )
         modelContext.insert(duplicate)
-        do { try modelContext.save() }
+        do {
+            try modelContext.save()
+            refreshReconciledState()
+        }
         catch { nutritionError = "The duplicate was not saved. Try again." }
     }
 
     private func deleteFoodEntry(_ entry: FoodEntryRecord) {
         entry.deletedAt = .now
         entry.updatedAt = .now
-        do { try modelContext.save() }
+        do {
+            try modelContext.save()
+            refreshReconciledState()
+        }
         catch { nutritionError = "The food entry was kept. Try again." }
     }
 
@@ -477,6 +573,7 @@ struct TodayView: View {
             } else {
                 try NutritionDayService.reopen(existing: nutritionDay, context: modelContext)
             }
+            refreshReconciledState()
         } catch {
             nutritionError = "Your nutrition status was not changed. Try again."
         }
@@ -494,7 +591,7 @@ struct TodayView: View {
             ActivityRow(
                 symbol: symbol,
                 title: fallbackTitle,
-                detail: occurrence.map { $0.statusRaw == "completed" ? "Completed at \($0.completedAt?.formatted(date: .omitted, time: .shortened) ?? "today")" : "Due at \($0.dueAt.formatted(date: .omitted, time: .shortened))" } ?? detail,
+                detail: occurrence.map(careStatusDetail) ?? detail,
                 tint: occurrence?.statusRaw == "completed" ? MomentumTheme.success : MomentumTheme.pulse
             )
         }
@@ -502,15 +599,24 @@ struct TodayView: View {
     }
 
     private var morningOccurrence: CareOccurrenceRecord? {
-        occurrence { $0.routineNameSnapshot == "Morning care" }
+        occurrence { $0.routineRoleRaw == "morning" || $0.routineNameSnapshot == "Morning care" }
     }
 
     private var nightOccurrence: CareOccurrenceRecord? {
-        occurrence { $0.routineNameSnapshot.hasPrefix("Night care") }
+        occurrence { $0.routineRoleRaw == "night" || $0.routineNameSnapshot.hasPrefix("Night care") }
     }
 
     private var hairOccurrence: CareOccurrenceRecord? {
-        occurrence { $0.routineNameSnapshot == "Hair care" }
+        occurrence { $0.routineRoleRaw == "hair" || $0.routineNameSnapshot == "Hair care" }
+    }
+
+    private var postWorkoutOccurrences: [CareOccurrenceRecord] {
+        occurrences
+            .filter {
+                $0.dueDomainDay == PersistedDomainDay.encode(currentDomainDay) &&
+                $0.routineRoleRaw == "postWorkout"
+            }
+            .sorted { $0.dueAt < $1.dueAt }
     }
 
     private func occurrence(where predicate: (CareOccurrenceRecord) -> Bool) -> CareOccurrenceRecord? {
@@ -518,6 +624,26 @@ struct TodayView: View {
             .filter { $0.dueDomainDay == PersistedDomainDay.encode(currentDomainDay) && predicate($0) }
             .sorted { $0.dueAt < $1.dueAt }
             .first
+    }
+
+    private func careStatusDetail(_ occurrence: CareOccurrenceRecord) -> String {
+        switch occurrence.statusRaw {
+        case "completed":
+            return "Completed at \(occurrence.completedAt?.formatted(date: .omitted, time: .shortened) ?? "today")"
+        case "skipped":
+            return "Skipped today"
+        case "missed":
+            return "Missed"
+        default:
+            return "Due at \(occurrence.dueAt.formatted(date: .omitted, time: .shortened))"
+        }
+    }
+
+    private func refreshReconciledState() {
+        Task {
+            do { try await DailyReconciler.reconcileAndNotify(in: modelContext) }
+            catch { reconciliationError = "Today’s reminders could not be refreshed. Try again in a moment." }
+        }
     }
 
     private var consistencySection: some View {
@@ -531,27 +657,12 @@ struct TodayView: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 5) {
-                ForEach(0..<16, id: \.self) { offset in
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(consistencyColor(offset: offset))
-                        .frame(height: 18)
-                }
+            CompactHistoryHeatmapView(currentDay: currentDomainDay, calendar: calendar) { day in
+                HistoryProjection.adherenceScore(on: day, facts: adherenceFacts, category: .all)
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Consistency history")
-            .accessibilityValue("Workout history will appear here as you finish sessions")
 
-            Text("Finish a workout and log your day to build the thread.")
-                .font(.body)
-                .foregroundStyle(.secondary)
+            HistoryStreakSummaryView(summary: adherenceStreaks, category: .all)
         }
-    }
-
-    private func consistencyColor(offset: Int) -> Color {
-        let day = currentDomainDay.adding(days: -(15 - offset), calendar: calendar)
-        let finished = sessions.contains { $0.completionDomainDay == PersistedDomainDay.encode(day) && $0.finishedAt != nil }
-        return finished ? MomentumTheme.pulse : Color.secondary.opacity(0.14)
     }
 
     private func start(workout: WorkoutTemplateRecord, scheduledDay: DomainDay) {

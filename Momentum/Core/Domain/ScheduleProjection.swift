@@ -11,7 +11,7 @@ enum ScheduleProjection {
         DomainDay.containing(
             now,
             calendar: calendar,
-            cutoffMinutes: settings.max(by: { $0.updatedAt < $1.updatedAt })?.domainDayCutoffMinutes ?? 180
+            cutoffMinutes: AppSettingsRecord.canonical(in: settings)?.domainDayCutoffMinutes ?? 180
         )
     }
 

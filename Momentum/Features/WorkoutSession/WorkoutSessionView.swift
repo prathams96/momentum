@@ -14,6 +14,7 @@ struct WorkoutSessionView: View {
     @Query private var prescriptions: [ExercisePrescriptionRecord]
     @Query private var alternatives: [ExerciseAlternativeRecord]
     @Query private var loadSuggestions: [LoadSuggestionRecord]
+    @Query private var settingsRecords: [AppSettingsRecord]
 
     @State private var showFinishConfirmation = false
     @State private var showPostWorkoutCheckIn = false
@@ -35,6 +36,9 @@ struct WorkoutSessionView: View {
     }
 
     private var session: WorkoutSessionRecord? { sessions.first }
+    private var unitSystem: UnitSystemOption {
+        UnitSystemOption(rawValue: AppSettingsRecord.canonical(in: settingsRecords)?.unitSystemRaw ?? "metric") ?? .metric
+    }
 
     private var hasUnfinishedSets: Bool {
         setLogsForSession.contains { $0.statusRaw == "pending" }
@@ -61,6 +65,7 @@ struct WorkoutSessionView: View {
                                         .sorted { $0.setNumber < $1.setNumber },
                                     previousSets: previousSets(for: exercise),
                                     alternatives: alternatives.filter { $0.prescriptionID == exercise.prescriptionID },
+                                    unitSystem: unitSystem,
                                     onSelectAlternative: { alternative in
                                         exercise.exerciseNameSnapshot = alternative.displayName
                                         exercise.updatedAt = .now
@@ -222,6 +227,7 @@ struct WorkoutSessionView: View {
         session.updatedAt = finishedAt
 
         guard persist() else { return }
+        Task { try? await DailyReconciler.reconcileAndNotify(in: modelContext) }
         showPostWorkoutCheckIn = true
     }
 
@@ -233,6 +239,7 @@ struct WorkoutSessionView: View {
                   .compactMap { log -> (ExerciseLogRecord, WorkoutSessionRecord)? in
                       guard let source = allSessions.first(where: { $0.id == log.workoutSessionID }),
                             source.finishedAt != nil,
+                            source.deletedAt == nil,
                             source.startedAt < session.startedAt else { return nil }
                       return (log, source)
                   }
@@ -271,35 +278,35 @@ private struct PostWorkoutCheckInView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Bindable var session: WorkoutSessionRecord
+    @Query private var settingsRecords: [AppSettingsRecord]
 
-    @State private var energy = "steady"
-    @State private var soreness = "none"
+    @State private var heavySweating = false
+    @State private var goingOutdoorsAgain = false
     @State private var note = ""
     @State private var weight = ""
+    @State private var saveError: String?
 
-    private let energyOptions = [("low", "Low"), ("steady", "Steady"), ("strong", "Strong")]
-    private let sorenessOptions = [("none", "None"), ("some", "Some"), ("high", "High")]
+    private var unitSystem: UnitSystemOption {
+        UnitSystemOption(rawValue: AppSettingsRecord.canonical(in: settingsRecords)?.unitSystemRaw ?? "metric") ?? .metric
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker("Energy", selection: $energy) {
-                        ForEach(energyOptions, id: \.0) { value, label in
-                            Text(label).tag(value)
-                        }
+                Section("Post-workout care") {
+                    Toggle("Heavy sweating?", isOn: $heavySweating)
+                    if heavySweating {
+                        Toggle("Going outdoors again?", isOn: $goingOutdoorsAgain)
+                        Text(goingOutdoorsAgain
+                             ? "Wash Face and Reapply Sunscreen will be added to Today."
+                             : "Wash Face will be added to Today.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
-                    Picker("Soreness", selection: $soreness) {
-                        ForEach(sorenessOptions, id: \.0) { value, label in
-                            Text(label).tag(value)
-                        }
-                    }
-                } header: {
-                    Text("How did that feel?")
                 }
 
                 Section("Optional") {
-                    TextField("Body weight (kg)", text: $weight)
+                    TextField("Body weight (\(MeasurementKind.weight.unit(unitSystem: unitSystem)))", text: $weight)
                         .keyboardType(.decimalPad)
                     TextField("Anything worth remembering?", text: $note, axis: .vertical)
                         .lineLimit(2...4)
@@ -317,29 +324,86 @@ private struct PostWorkoutCheckInView: View {
             }
         }
         .onAppear {
-            energy = session.postWorkoutEnergyRaw ?? energy
-            soreness = session.postWorkoutSorenessRaw ?? soreness
             note = session.postWorkoutNote ?? ""
+        }
+        .alert("Couldn’t save check-in", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
+            Button("Retry") { save() }
+            Button("Keep editing", role: .cancel) {}
+        } message: {
+            Text(saveError ?? "Your answers are still on screen.")
         }
     }
 
     private func save() {
-        session.postWorkoutEnergyRaw = energy
-        session.postWorkoutSorenessRaw = soreness
         session.postWorkoutNote = note.isEmpty ? nil : note
         if let value = Double(weight), value > 0,
            let day = PersistedDomainDay.decode(session.completionDomainDay ?? session.scheduledDomainDay) {
             modelContext.insert(BodyMeasurementRecord(
                 kindRaw: "weightKg",
-                value: value,
+                value: MeasurementKind.weight.metricValue(displayValue: value, unitSystem: unitSystem),
                 measuredAt: .now,
                 domainDay: PersistedDomainDay.encode(day),
                 sourceRaw: "postWorkout"
             ))
         }
+        if heavySweating {
+            PostWorkoutCareService.ensureOccurrence(
+                for: session,
+                includeSunscreen: goingOutdoorsAgain,
+                in: modelContext
+            )
+        }
         session.updatedAt = .now
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            Task { try? await DailyReconciler.reconcileAndNotify(in: modelContext) }
+            dismiss()
+        } catch {
+            saveError = "The workout is complete, but this check-in was not saved. Try again."
+        }
+    }
+}
+
+@MainActor
+enum PostWorkoutCareService {
+    static func ensureOccurrence(
+        for session: WorkoutSessionRecord,
+        includeSunscreen: Bool,
+        in context: ModelContext,
+        now: Date = .now
+    ) {
+        let domainDay = session.completionDomainDay ?? session.scheduledDomainDay
+        let existing = (try? context.fetch(FetchDescriptor<CareOccurrenceRecord>()))?
+            .first { $0.sourceWorkoutSessionID == session.id && $0.routineRoleRaw == "postWorkout" }
+        let occurrence = existing ?? CareOccurrenceRecord(
+            routineNameSnapshot: "Post-workout care",
+            routineRoleRaw: "postWorkout",
+            sourceWorkoutSessionID: session.id,
+            dueDomainDay: domainDay,
+            dueAt: now
+        )
+        if existing == nil { context.insert(occurrence) }
+
+        let currentTasks = ((try? context.fetch(FetchDescriptor<CareTaskCompletionRecord>())) ?? [])
+            .filter { $0.occurrenceID == occurrence.id }
+        if !currentTasks.contains(where: { $0.labelSnapshot == "Wash Face" }) {
+            context.insert(CareTaskCompletionRecord(
+                occurrenceID: occurrence.id,
+                labelSnapshot: "Wash Face",
+                instructionSnapshot: "Cleanse after heavy sweating."
+            ))
+        }
+        if includeSunscreen,
+           !currentTasks.contains(where: { $0.labelSnapshot == "Reapply Sunscreen" }) {
+            context.insert(CareTaskCompletionRecord(
+                occurrenceID: occurrence.id,
+                labelSnapshot: "Reapply Sunscreen",
+                instructionSnapshot: "Apply SPF 50 before going outdoors again."
+            ))
+        }
     }
 }
 
@@ -348,6 +412,7 @@ private struct ExerciseLoggingSection: View {
     let sets: [SetLogRecord]
     let previousSets: [SetLogRecord]
     let alternatives: [ExerciseAlternativeRecord]
+    let unitSystem: UnitSystemOption
     let onSelectAlternative: (ExerciseAlternativeRecord) -> Void
     let onSkipExercise: () -> Void
 
@@ -385,7 +450,8 @@ private struct ExerciseLoggingSection: View {
                 WorkingSetRow(
                     set: set,
                     repetitionUnit: exercise.repUnitSnapshot,
-                    previous: previousSets.first { $0.setNumber == set.setNumber }
+                    previous: previousSets.first { $0.setNumber == set.setNumber },
+                    unitSystem: unitSystem
                 )
             }
         }
@@ -398,6 +464,21 @@ private struct WorkingSetRow: View {
     @Bindable var set: SetLogRecord
     let repetitionUnit: String
     let previous: SetLogRecord?
+    let unitSystem: UnitSystemOption
+
+    private var weightBinding: Binding<Double> {
+        Binding(
+            get: { MeasurementKind.weight.displayValue(metricValue: set.weightKg, unitSystem: unitSystem) },
+            set: {
+                set.weightKg = MeasurementKind.weight.metricValue(displayValue: $0, unitSystem: unitSystem)
+                set.updatedAt = .now
+            }
+        )
+    }
+
+    private var weightUnit: String {
+        MeasurementKind.weight.unit(unitSystem: unitSystem)
+    }
 
     private var rirBinding: Binding<Int> {
         Binding(
@@ -415,15 +496,15 @@ private struct WorkingSetRow: View {
 
                 VStack(spacing: 2) {
                     TextField(
-                        "kg",
-                        value: $set.weightKg,
+                        weightUnit,
+                        value: weightBinding,
                         format: .number.precision(.fractionLength(0...2))
                     )
                     .keyboardType(.decimalPad)
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
                     .monospacedDigit()
-                    Text("kg")
+                    Text(weightUnit)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -475,7 +556,7 @@ private struct WorkingSetRow: View {
                     set.updatedAt = .now
                 } label: {
                     Label(
-                        "Copy last time: \(DecimalFormatter.onePlace(previous.weightKg)) kg × \(previous.repetitions)",
+                        "Copy last time: \(MeasurementKind.weight.formatted(metricValue: previous.weightKg, unitSystem: unitSystem)) × \(previous.repetitions)",
                         systemImage: "arrow.down.doc"
                     )
                     .font(.caption)

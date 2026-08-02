@@ -78,7 +78,11 @@ enum WorkoutSessionStarter {
 
             if exercise.workingSetCount > 0 {
                 for setNumber in 1...exercise.workingSetCount {
-                    let set = SetLogRecord(exerciseLogID: log.id, setNumber: setNumber)
+                    let set = SetLogRecord(
+                        exerciseLogID: log.id,
+                        setNumber: setNumber,
+                        weightKg: exercise.workingWeightKg
+                    )
                     context.insert(set)
                     insertedSets.append(set)
                 }

@@ -1,6 +1,7 @@
 import XCTest
 
 final class MomentumUITests: XCTestCase {
+    @MainActor
     func testAppLaunches() {
         let app = XCUIApplication()
         app.launchArguments = ["-usePreviewStore"]

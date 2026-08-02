@@ -209,6 +209,7 @@ struct FoodEntrySheet: View {
 
         do {
             try modelContext.save()
+            Task { try? await DailyReconciler.reconcileAndNotify(in: modelContext) }
             dismiss()
         } catch {
             saveError = "Your food entry was kept. Try saving again."

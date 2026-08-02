@@ -525,7 +525,7 @@ struct OnboardingView: View {
             let calorieMinimum = Int(calorieMinimum),
             let calorieMaximum = Int(calorieMaximum),
             let proteinMinimum = Int(proteinMinimum),
-            let settings = settings.max(by: { $0.updatedAt < $1.updatedAt })
+            let settings = AppSettingsRecord.canonical(in: settings)
         else { return }
 
         isFinishing = true

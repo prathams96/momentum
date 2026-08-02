@@ -284,6 +284,123 @@ final class MomentumAppTests: XCTestCase {
         XCTAssertEqual(events.first?.domainDay, "2026-08-02")
     }
 
+    func testDailyReconcilerRecordsEveryElapsedDueWorkoutOpportunity() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let dueDay = DomainDay(year: 2026, month: 8, day: 2)
+        try SeedData.install(in: context, currentDomainDay: dueDay)
+        let anchor = try XCTUnwrap(context.fetch(FetchDescriptor<CycleAnchorRecord>()).first)
+        anchor.firstDueDomainDay = PersistedDomainDay.encode(dueDay)
+        try context.save()
+
+        let now = PersistedDomainDay.date(
+            for: DomainDay(year: 2026, month: 8, day: 5),
+            calendar: .autoupdatingCurrent,
+            hour: 12
+        )!
+        try DailyReconciler.reconcile(in: context, now: now)
+        try DailyReconciler.reconcile(in: context, now: now)
+
+        let events = try context.fetch(FetchDescriptor<WorkoutDayEventRecord>())
+            .filter { $0.kindRaw == "missed" }
+            .sorted { $0.domainDay < $1.domainDay }
+        XCTAssertEqual(events.map(\.domainDay), ["2026-08-02", "2026-08-03", "2026-08-04"])
+    }
+
+    func testDailyReconcilerRecordsMissesWhenOpenSessionCrossesCutoff() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let dueDay = DomainDay(year: 2026, month: 8, day: 2)
+        try SeedData.install(in: context, currentDomainDay: dueDay)
+        let anchor = try XCTUnwrap(context.fetch(FetchDescriptor<CycleAnchorRecord>()).first)
+        let workout = try XCTUnwrap(
+            context.fetch(FetchDescriptor<WorkoutTemplateRecord>())
+                .first { $0.id == anchor.nextWorkoutTemplateID }
+        )
+        context.insert(WorkoutSessionRecord(
+            workoutTemplateID: workout.id,
+            workoutNameSnapshot: workout.name,
+            focusSnapshot: workout.focus,
+            sequenceIndexSnapshot: workout.sequenceIndex,
+            scheduledDomainDay: "2026-08-02",
+            startedAt: PersistedDomainDay.date(for: dueDay, calendar: .autoupdatingCurrent, hour: 18)!
+        ))
+        try context.save()
+
+        let now = PersistedDomainDay.date(
+            for: DomainDay(year: 2026, month: 8, day: 4),
+            calendar: .autoupdatingCurrent,
+            hour: 12
+        )!
+        try DailyReconciler.reconcile(in: context, now: now)
+
+        let events = try context.fetch(FetchDescriptor<WorkoutDayEventRecord>())
+            .filter { $0.kindRaw == "missed" }
+            .sorted { $0.domainDay < $1.domainDay }
+        XCTAssertEqual(events.map(\.domainDay), ["2026-08-02", "2026-08-03"])
+    }
+
+    func testDailyReconcilerKeepsDeterministicCompletedOccurrenceSurvivor() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let routineID = UUID()
+        let day = DomainDay(year: 2026, month: 8, day: 2)
+        let dueAt = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 9)!
+        let completedID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let pendingID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        context.insert(CareOccurrenceRecord(
+            id: pendingID,
+            routineTemplateID: routineID,
+            routineNameSnapshot: "Morning care",
+            dueDomainDay: "2026-08-02",
+            dueAt: dueAt,
+            createdAt: Date(timeIntervalSince1970: 1)
+        ))
+        context.insert(CareOccurrenceRecord(
+            id: completedID,
+            routineTemplateID: routineID,
+            routineNameSnapshot: "Morning care",
+            dueDomainDay: "2026-08-02",
+            dueAt: dueAt,
+            statusRaw: "completed",
+            completedAt: dueAt,
+            createdAt: Date(timeIntervalSince1970: 2)
+        ))
+        try context.save()
+
+        let now = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 12)!
+        try DailyReconciler.reconcile(in: context, now: now)
+
+        let occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
+        XCTAssertEqual(occurrences.first { $0.id == completedID }?.statusRaw, "completed")
+        XCTAssertEqual(occurrences.first { $0.id == pendingID }?.statusRaw, "repairedDuplicate")
+    }
+
+    func testDailyReconcilerDoesNotMergePostWorkoutCareFromDifferentSessions() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let day = DomainDay(year: 2026, month: 8, day: 2)
+        let dueAt = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 18)!
+        for sourceID in [UUID(), UUID()] {
+            context.insert(CareOccurrenceRecord(
+                routineNameSnapshot: "Post-workout care",
+                routineRoleRaw: "postWorkout",
+                sourceWorkoutSessionID: sourceID,
+                dueDomainDay: "2026-08-02",
+                dueAt: dueAt
+            ))
+        }
+        try context.save()
+
+        let now = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 20)!
+        try DailyReconciler.reconcile(in: context, now: now)
+
+        let occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
+            .filter { $0.routineRoleRaw == "postWorkout" }
+        XCTAssertEqual(occurrences.count, 2)
+        XCTAssertTrue(occurrences.allSatisfy { $0.statusRaw == "pending" })
+    }
+
     func testExplicitWorkoutSkipPreventsMissedEvent() throws {
         let container = try ModelContainerFactory.makePreview()
         let context = container.mainContext
@@ -335,6 +452,140 @@ final class MomentumAppTests: XCTestCase {
             reminders.map(\.identifier),
             ["workout.\(workoutID.uuidString).2026-08-02", "evening.2026-08-02"]
         )
+    }
+
+    func testOverdueWorkoutReminderRepresentsCurrentOpportunity() throws {
+        let settings = AppSettingsRecord(
+            domainDayCutoffMinutes: 180,
+            workoutNotificationMinutes: 18 * 60
+        )
+        let currentDay = DomainDay(year: 2026, month: 8, day: 4)
+        let now = PersistedDomainDay.date(
+            for: currentDay,
+            calendar: .autoupdatingCurrent,
+            hour: 12
+        )!
+        let workoutID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
+
+        let reminders = ReminderDeriver.reminders(
+            scheduleState: .due(
+                workoutID: workoutID,
+                dueDay: DomainDay(year: 2026, month: 8, day: 2),
+                overdueBy: 2
+            ),
+            settings: settings,
+            occurrences: [],
+            nutritionDay: NutritionDayRecord(domainDay: "2026-08-04", finalizedAt: now),
+            now: now,
+            calendar: .autoupdatingCurrent
+        )
+
+        let workout = try XCTUnwrap(reminders.first { $0.categoryIdentifier == MomentumNotificationCategory.workoutDue })
+        XCTAssertEqual(workout.identifier, "workout.\(workoutID.uuidString).2026-08-04")
+        XCTAssertEqual(workout.userInfo["domainDay"], "2026-08-04")
+    }
+
+    func testWorkoutNotificationRouteCarriesTargetAndCurrentOpportunityDay() throws {
+        let workoutID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
+        let route = try XCTUnwrap(WorkoutNotificationRoute(userInfo: [
+            "workoutID": workoutID.uuidString,
+            "domainDay": "2026-08-04"
+        ]))
+
+        XCTAssertEqual(route.workoutID, workoutID)
+        XCTAssertEqual(route.domainDay, DomainDay(year: 2026, month: 8, day: 4))
+    }
+
+    func testNightCareAndOpenNutritionAtSameTimeCoalesceIntoOneEveningReminder() throws {
+        let settings = AppSettingsRecord(
+            domainDayCutoffMinutes: 180,
+            nutritionReminderMinutes: 22 * 60
+        )
+        let day = DomainDay(year: 2026, month: 8, day: 2)
+        let now = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 12)!
+        let dueAt = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 22)!
+        let occurrence = CareOccurrenceRecord(
+            routineNameSnapshot: "Editable night routine",
+            routineRoleRaw: "night",
+            dueDomainDay: "2026-08-02",
+            dueAt: dueAt
+        )
+
+        let reminders = ReminderDeriver.reminders(
+            scheduleState: .needsRepair(reason: .missingAnchorWorkout),
+            settings: settings,
+            occurrences: [occurrence],
+            nutritionDay: nil,
+            now: now,
+            calendar: .autoupdatingCurrent
+        )
+
+        XCTAssertEqual(reminders.count, 1)
+        XCTAssertEqual(reminders.first?.categoryIdentifier, MomentumNotificationCategory.eveningCheckIn)
+        XCTAssertEqual(reminders.first?.userInfo["occurrenceID"], occurrence.id.uuidString)
+    }
+
+    func testCompletingAlternatingCareFromNotificationAdvancesRecurrence() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let completionDay = DomainDay(year: 2026, month: 8, day: 2)
+        let originalPayload = CareRecurrencePayload(rule: .alternating(
+            anchorDueDay: completionDay,
+            intervals: [3, 4],
+            intervalAfterAnchorIndex: 0
+        ))
+        let originalData = try JSONEncoder().encode(originalPayload)
+        let originalValue = try XCTUnwrap(String(data: originalData, encoding: .utf8))
+        let routine = CareRoutineTemplateRecord(
+            name: "Hair care",
+            routineRoleRaw: "hair",
+            recurrenceKindRaw: "alternatingInterval",
+            recurrencePayload: originalValue,
+            notificationMinutes: 8 * 60,
+            rollsForwardWhenMissed: true
+        )
+        let dueAt = PersistedDomainDay.date(for: completionDay, calendar: .autoupdatingCurrent, hour: 8)!
+        let occurrence = CareOccurrenceRecord(
+            routineTemplateID: routine.id,
+            routineNameSnapshot: routine.name,
+            routineRoleRaw: routine.routineRoleRaw,
+            dueDomainDay: "2026-08-02",
+            dueAt: dueAt
+        )
+        let task = CareTaskCompletionRecord(
+            occurrenceID: occurrence.id,
+            labelSnapshot: "Wash scalp"
+        )
+        context.insert(routine)
+        context.insert(occurrence)
+        context.insert(task)
+        try context.save()
+
+        let changed = try DailyReconciler.completeCareOccurrence(
+            occurrenceID: occurrence.id,
+            in: context,
+            now: dueAt,
+            calendar: .autoupdatingCurrent
+        )
+        let repeated = try DailyReconciler.completeCareOccurrence(
+            occurrenceID: occurrence.id,
+            in: context,
+            now: dueAt.addingTimeInterval(60),
+            calendar: .autoupdatingCurrent
+        )
+
+        XCTAssertTrue(changed)
+        XCTAssertFalse(repeated)
+        XCTAssertEqual(occurrence.statusRaw, "completed")
+        XCTAssertEqual(task.statusRaw, "completed")
+        XCTAssertEqual(occurrence.recurrencePayloadBeforeCompletion, originalValue)
+        let advancedData = try XCTUnwrap(routine.recurrencePayload.data(using: .utf8))
+        let advanced = try JSONDecoder().decode(CareRecurrencePayload.self, from: advancedData)
+        XCTAssertEqual(advanced.rule, .alternating(
+            anchorDueDay: DomainDay(year: 2026, month: 8, day: 5),
+            intervals: [3, 4],
+            intervalAfterAnchorIndex: 1
+        ))
     }
 
     func testNutritionDayFinalizationSnapshotsTargetAndCanReopen() throws {

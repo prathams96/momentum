@@ -1,12 +1,31 @@
 import Foundation
+import MomentumCore
 import SwiftData
 import UIKit
 import UserNotifications
+
+struct WorkoutNotificationRoute: Equatable, Sendable {
+    let workoutID: UUID
+    let domainDay: DomainDay
+
+    init?(userInfo: [String: String]) {
+        guard let workoutValue = userInfo["workoutID"],
+              let workoutID = UUID(uuidString: workoutValue),
+              let dayValue = userInfo["domainDay"],
+              let domainDay = PersistedDomainDay.decode(dayValue) else {
+            return nil
+        }
+        self.workoutID = workoutID
+        self.domainDay = domainDay
+    }
+}
 
 @MainActor
 final class MomentumNotificationDelegate: NSObject, @preconcurrency UNUserNotificationCenterDelegate {
     var modelContext: ModelContext?
     var onOpenToday: (() -> Void)?
+    /// AppShell supplies this to turn a notification action into the actual target workout flow.
+    var onStartWorkout: ((WorkoutNotificationRoute) -> Void)?
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -26,7 +45,16 @@ final class MomentumNotificationDelegate: NSObject, @preconcurrency UNUserNotifi
             if let value = item.value as? String { result[String(describing: item.key)] = value }
         }
 
-        if action == MomentumNotificationAction.openToday || action == MomentumNotificationAction.startWorkout {
+        if action == MomentumNotificationAction.startWorkout {
+            if let route = WorkoutNotificationRoute(userInfo: info), let onStartWorkout {
+                onStartWorkout(route)
+            } else {
+                onOpenToday?()
+            }
+            return
+        }
+
+        if action == MomentumNotificationAction.openToday || action == UNNotificationDefaultActionIdentifier {
             onOpenToday?()
         }
 
@@ -45,18 +73,10 @@ final class MomentumNotificationDelegate: NSObject, @preconcurrency UNUserNotifi
         switch action {
         case MomentumNotificationAction.markCareDone:
             guard let id = info["occurrenceID"], let occurrenceID = UUID(uuidString: id),
-                  let occurrence = (try? modelContext.fetch(FetchDescriptor<CareOccurrenceRecord>()))?.first(where: { $0.id == occurrenceID }),
-                  occurrence.statusRaw == "pending" else { return }
-            occurrence.statusRaw = "completed"
-            occurrence.completedAt = Date.now
-            occurrence.updatedAt = Date.now
-            let completions = ((try? modelContext.fetch(FetchDescriptor<CareTaskCompletionRecord>())) ?? [])
-                .filter { $0.occurrenceID == occurrenceID }
-            for completion in completions {
-                completion.statusRaw = "completed"
-                completion.completedAt = Date.now
-                completion.updatedAt = Date.now
-            }
+                  (try? DailyReconciler.completeCareOccurrence(
+                    occurrenceID: occurrenceID,
+                    in: modelContext
+                  )) == true else { return }
         case MomentumNotificationAction.skipToday:
             if info["kind"] == "careDue",
                let id = info["occurrenceID"], let occurrenceID = UUID(uuidString: id),

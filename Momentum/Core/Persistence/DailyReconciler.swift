@@ -9,8 +9,9 @@ enum DailyReconciler {
         now: Date = .now,
         calendar: Calendar = .autoupdatingCurrent
     ) throws {
-        let settings = try context.fetch(FetchDescriptor<AppSettingsRecord>())
-            .max { $0.updatedAt < $1.updatedAt }
+        let settings = AppSettingsRecord.canonical(
+            in: try context.fetch(FetchDescriptor<AppSettingsRecord>())
+        )
         let cutoff = settings?.domainDayCutoffMinutes ?? 180
         let today = DomainDay.containing(now, calendar: calendar, cutoffMinutes: cutoff)
         let yesterday = today.adding(days: -1, calendar: calendar)
@@ -67,7 +68,7 @@ enum DailyReconciler {
         let workouts = try context.fetch(FetchDescriptor<WorkoutTemplateRecord>())
         let anchors = try context.fetch(FetchDescriptor<CycleAnchorRecord>())
         let sessions = try context.fetch(FetchDescriptor<WorkoutSessionRecord>())
-        reconcileWorkoutEvent(
+        reconcileWorkoutEvents(
             state: ScheduleProjection.evaluate(
                 workouts: workouts,
                 anchors: anchors,
@@ -80,7 +81,8 @@ enum DailyReconciler {
             sessions: sessions,
             events: try context.fetch(FetchDescriptor<WorkoutDayEventRecord>()),
             context: context,
-            now: now
+            now: now,
+            calendar: calendar
         )
 
         try context.save()
@@ -93,8 +95,9 @@ enum DailyReconciler {
     ) async throws {
         try reconcile(in: context, now: now, calendar: calendar)
 
-        let settings = try context.fetch(FetchDescriptor<AppSettingsRecord>())
-            .max { $0.updatedAt < $1.updatedAt }
+        let settings = AppSettingsRecord.canonical(
+            in: try context.fetch(FetchDescriptor<AppSettingsRecord>())
+        )
         let occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
         let nutritionDays = try context.fetch(FetchDescriptor<NutritionDayRecord>())
         let workouts = try context.fetch(FetchDescriptor<WorkoutTemplateRecord>())
@@ -121,7 +124,53 @@ enum DailyReconciler {
             now: now,
             calendar: calendar
         )
-        try await NotificationScheduler().reconcile(reminders)
+        do {
+            try await NotificationScheduler().reconcile(reminders)
+            settings?.notificationSchedulingStatusRaw = "healthy"
+            try context.save()
+        } catch {
+            settings?.notificationSchedulingStatusRaw = "failed"
+            try? context.save()
+            throw error
+        }
+    }
+
+    /// Completes a Care Routine through the same mutation boundary used by notification actions.
+    /// Returns `false` when the action was already applied or the occurrence no longer exists.
+    @discardableResult
+    static func completeCareOccurrence(
+        occurrenceID: UUID,
+        in context: ModelContext,
+        now: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent
+    ) throws -> Bool {
+        guard let occurrence = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
+            .first(where: { $0.id == occurrenceID }),
+              occurrence.statusRaw == "pending" else {
+            return false
+        }
+
+        occurrence.statusRaw = "completed"
+        occurrence.completedAt = now
+        occurrence.skippedAt = nil
+        occurrence.updatedAt = now
+
+        let completions = try context.fetch(FetchDescriptor<CareTaskCompletionRecord>())
+            .filter { $0.occurrenceID == occurrenceID }
+        for completion in completions {
+            completion.statusRaw = "completed"
+            completion.completedAt = now
+            completion.updatedAt = now
+        }
+
+        try advanceAlternatingRecurrenceIfNeeded(
+            for: occurrence,
+            in: context,
+            now: now,
+            calendar: calendar
+        )
+        try context.save()
+        return true
     }
 
     private static func repairDuplicateOccurrences(
@@ -129,54 +178,136 @@ enum DailyReconciler {
         now: Date
     ) {
         let grouped = Dictionary(grouping: occurrences) { occurrence in
-            "\(occurrence.routineTemplateID?.uuidString ?? "none")|\(occurrence.dueDomainDay)"
+            [
+                occurrence.routineTemplateID?.uuidString ?? "none",
+                occurrence.routineRoleRaw,
+                occurrence.sourceWorkoutSessionID?.uuidString ?? "none",
+                occurrence.dueDomainDay
+            ].joined(separator: "|")
         }
         for group in grouped.values where group.count > 1 {
-            for duplicate in group.dropFirst().sorted(by: duplicateOrder) {
+            let ordered = group.sorted(by: survivorOrder)
+            for duplicate in ordered.dropFirst() {
                 duplicate.statusRaw = "repairedDuplicate"
                 duplicate.updatedAt = now
             }
         }
     }
 
-    private static func duplicateOrder(
+    /// Preserve the strongest recorded intent, then resolve ties without relying on fetch order.
+    private static func survivorOrder(
         _ lhs: CareOccurrenceRecord,
         _ rhs: CareOccurrenceRecord
     ) -> Bool {
+        let lhsRank = occurrenceStatusRank(lhs.statusRaw)
+        let rhsRank = occurrenceStatusRank(rhs.statusRaw)
+        if lhsRank != rhsRank { return lhsRank < rhsRank }
+        if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
         if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
         return lhs.id.uuidString < rhs.id.uuidString
     }
 
-    private static func reconcileWorkoutEvent(
+    private static func occurrenceStatusRank(_ status: String) -> Int {
+        switch status {
+        case "completed": 0
+        case "skipped": 1
+        case "missed": 2
+        case "pending": 3
+        default: 4
+        }
+    }
+
+    private static func reconcileWorkoutEvents(
         state: WorkoutScheduleState,
         currentDay: DomainDay,
         sessions: [WorkoutSessionRecord],
         events: [WorkoutDayEventRecord],
         context: ModelContext,
-        now: Date
+        now: Date,
+        calendar: Calendar
     ) {
-        guard case let .due(workoutID, dueDay, _) = state,
-              dueDay < currentDay else { return }
-        let dayValue = PersistedDomainDay.encode(dueDay)
-        let alreadyRecorded = events.contains {
-            $0.deletedAt == nil &&
-            $0.domainDay == dayValue &&
-            $0.dueWorkoutTemplateID == workoutID &&
-            ($0.kindRaw == "missed" || $0.kindRaw == "skipped")
+        let opportunity: (workoutID: UUID, dueDay: DomainDay)?
+        switch state {
+        case let .due(workoutID, dueDay, _):
+            opportunity = (workoutID, dueDay)
+        case let .active(sessionID):
+            let activeSession = sessions.first(where: {
+                $0.id == sessionID && $0.deletedAt == nil && $0.finishedAt == nil
+            })
+            if let activeSession,
+               let workoutID = activeSession.workoutTemplateID,
+               let scheduledDay = PersistedDomainDay.decode(activeSession.scheduledDomainDay) {
+                opportunity = (workoutID, scheduledDay)
+            } else {
+                opportunity = nil
+            }
+        case .recovery, .needsRepair:
+            opportunity = nil
         }
-        let completedForDueDay = sessions.contains {
-            $0.deletedAt == nil &&
-            $0.finishedAt != nil &&
-            $0.scheduledDomainDay == dayValue
+        guard let opportunity, opportunity.dueDay < currentDay else { return }
+        let workoutID = opportunity.workoutID
+        let dueDay = opportunity.dueDay
+        var elapsedOpportunity = dueDay
+        while elapsedOpportunity < currentDay {
+            let dayValue = PersistedDomainDay.encode(elapsedOpportunity)
+            let alreadyRecorded = events.contains {
+                $0.deletedAt == nil &&
+                $0.domainDay == dayValue &&
+                $0.dueWorkoutTemplateID == workoutID &&
+                ($0.kindRaw == "missed" || $0.kindRaw == "skipped")
+            }
+            let completedForOpportunity = sessions.contains {
+                $0.deletedAt == nil &&
+                $0.finishedAt != nil &&
+                ($0.completionDomainDay == dayValue || $0.scheduledDomainDay == dayValue)
+            }
+            if !alreadyRecorded, !completedForOpportunity {
+                context.insert(WorkoutDayEventRecord(
+                    domainDay: dayValue,
+                    dueWorkoutTemplateID: workoutID,
+                    kindRaw: "missed",
+                    createdAt: now,
+                    updatedAt: now
+                ))
+            }
+            elapsedOpportunity = elapsedOpportunity.adding(days: 1, calendar: calendar)
         }
-        guard !alreadyRecorded, !completedForDueDay else { return }
-        context.insert(WorkoutDayEventRecord(
-            domainDay: dayValue,
-            dueWorkoutTemplateID: workoutID,
-            kindRaw: "missed",
-            createdAt: now,
-            updatedAt: now
-        ))
+    }
+
+    private static func advanceAlternatingRecurrenceIfNeeded(
+        for occurrence: CareOccurrenceRecord,
+        in context: ModelContext,
+        now: Date,
+        calendar: Calendar
+    ) throws {
+        guard let routineID = occurrence.routineTemplateID,
+              let routine = try context.fetch(FetchDescriptor<CareRoutineTemplateRecord>())
+                .first(where: { $0.id == routineID }),
+              routine.recurrenceKindRaw == "alternatingInterval",
+              let data = routine.recurrencePayload.data(using: .utf8),
+              let payload = try? JSONDecoder().decode(CareRecurrencePayload.self, from: data) else {
+            return
+        }
+        let settings = try context.fetch(FetchDescriptor<AppSettingsRecord>())
+            .max { $0.updatedAt < $1.updatedAt }
+        let completionDay = DomainDay.containing(
+            now,
+            calendar: calendar,
+            cutoffMinutes: settings?.domainDayCutoffMinutes ?? 180
+        )
+        guard let advanced = CareScheduleEngine().advancedAlternatingPayload(
+            afterCompletionOn: completionDay,
+            payload: payload,
+            calendar: calendar
+        ),
+        let encoded = try? JSONEncoder().encode(advanced),
+        let value = String(data: encoded, encoding: .utf8) else {
+            return
+        }
+
+        occurrence.recurrencePayloadBeforeCompletion = routine.recurrencePayload
+        routine.recurrencePayload = value
+        routine.updatedAt = now
     }
 
     private static func isDue(
@@ -238,6 +369,7 @@ enum DailyReconciler {
         return CareOccurrenceRecord(
             routineTemplateID: routine.id,
             routineNameSnapshot: routine.name,
+            routineRoleRaw: routine.routineRoleRaw,
             dueDomainDay: domainDayValue,
             dueAt: dueAt,
             rolledFromDomainDay: rolledFrom

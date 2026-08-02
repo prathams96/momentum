@@ -3,7 +3,7 @@ import MomentumCore
 import SwiftData
 
 enum SeedData {
-    static let currentVersion = 3
+    static let currentVersion = 4
 
     static func install(
         in context: ModelContext,
@@ -13,9 +13,11 @@ enum SeedData {
             cutoffMinutes: 180
         )
     ) throws {
-        let settings = try context.fetch(FetchDescriptor<AppSettingsRecord>())
-            .sorted { $0.updatedAt > $1.updatedAt }
-            .first
+        let settingsRecords = try context.fetch(FetchDescriptor<AppSettingsRecord>())
+        let settings = AppSettingsRecord.canonical(in: settingsRecords)
+        for duplicate in settingsRecords where duplicate.id != settings?.id {
+            context.delete(duplicate)
+        }
 
         let existingTargets = try context.fetch(FetchDescriptor<NutritionTargetRecord>())
         if existingTargets.isEmpty {
@@ -66,6 +68,20 @@ enum SeedData {
                     currentDomainDay: currentDomainDay
                 )
                 routine.updatedAt = .now
+            }
+        }
+
+        if settingsRecord.seedVersion < 4 {
+            let routines = try context.fetch(FetchDescriptor<CareRoutineTemplateRecord>())
+            for routine in routines {
+                routine.routineRoleRaw = careRole(for: routine.name)
+                routine.updatedAt = .now
+            }
+
+            let occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
+            for occurrence in occurrences where occurrence.routineRoleRaw == "custom" {
+                occurrence.routineRoleRaw = careRole(for: occurrence.routineNameSnapshot)
+                occurrence.updatedAt = .now
             }
         }
 
@@ -296,6 +312,7 @@ enum SeedData {
         SeedRoutine(
             record: CareRoutineTemplateRecord(
                 name: name,
+                routineRoleRaw: careRole(for: name),
                 recurrenceKindRaw: kind,
                 recurrencePayload: payload,
                 notificationMinutes: minutes,
@@ -336,6 +353,14 @@ enum SeedData {
         case "Hair care": return alternatingPayload(anchor: nextHairCareDay(after: currentDomainDay))
         default: return weekdayPayload([])
         }
+    }
+
+    private static func careRole(for name: String) -> String {
+        if name == "Morning care" { return "morning" }
+        if name.hasPrefix("Night care") { return "night" }
+        if name == "Hair care" { return "hair" }
+        if name == "Post-workout care" { return "postWorkout" }
+        return "custom"
     }
 
     private static func encode(_ payload: CareRecurrencePayload) -> String {
