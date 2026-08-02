@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-02T00:00:00Z",
+  "title": "Design System: Momentum",
+  "extensions": {
+    "colorMeta": {
+      "brand-pulse": {
+        "role": "primary",
+        "displayName": "Momentum Pulse",
+        "canonical": "oklch(0.620 0.200 355)",
+        "tonalRamp": [
+          "oklch(0.150 0.070 355)",
+          "oklch(0.260 0.110 355)",
+          "oklch(0.380 0.150 355)",
+          "oklch(0.500 0.180 355)",
+          "oklch(0.620 0.200 355)",
+          "oklch(0.740 0.150 355)",
+          "oklch(0.850 0.090 355)",
+          "oklch(0.950 0.030 355)"
+        ]
+      },
+      "data-cyan": {
+        "role": "secondary",
+        "displayName": "Data Cyan",
+        "canonical": "oklch(0.820 0.105 220)",
+        "tonalRamp": [
+          "oklch(0.150 0.040 220)",
+          "oklch(0.260 0.060 220)",
+          "oklch(0.380 0.080 220)",
+          "oklch(0.500 0.095 220)",
+          "oklch(0.620 0.105 220)",
+          "oklch(0.740 0.105 220)",
+          "oklch(0.850 0.085 220)",
+          "oklch(0.950 0.025 220)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Large Title",
+        "purpose": "Top-level navigation and rare milestone counts."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Activity, routine, exercise, and action emphasis."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Instructions, notes, and explanations."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, statuses, and compact totals."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "state-change",
+        "value": "150–220ms ease-out",
+        "purpose": "Localized completion, selection, and disclosure feedback."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "instant or crossfade",
+        "purpose": "Required alternative for every non-system animation."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "The Red Thread",
+    "overview": "Momentum is one continuous line of promises kept. Standard iOS structure, one rare pulse-red accent, chronological hierarchy, and calm evidence of accumulated effort make the next action obvious in bright gym light and in a dim bathroom at night.",
+    "keyCharacteristics": [
+      "Native, immediate, and one-handed",
+      "Dense enough for the gym, calm enough for evening care",
+      "Restrained color with one unmistakable pulse",
+      "Honest statuses and nonjudgmental copy",
+      "Flat content hierarchy with glass reserved for controls",
+      "Accessible in bright light, darkness, large type, and grayscale"
+    ],
+    "rules": [
+      {
+        "name": "The Ten Percent Rule",
+        "body": "Momentum Pulse occupies no more than roughly 10% of a normal screen. Its rarity gives it authority.",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaning Rule",
+        "body": "Pulse means action, selection, or earned emphasis. System semantic colors retain their standard meanings, and hue is never the only state cue.",
+        "section": "colors"
+      },
+      {
+        "name": "The Heatmap Rule",
+        "body": "Heatmap intensity uses a five-step tonal ramp, while no-obligation and zero-completion remain distinguishable without color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Read-It-Tired Rule",
+        "body": "Essential instructions use Body or stronger, never Caption plus low contrast.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence-Case Rule",
+        "body": "Buttons, statuses, and headings use sentence case. Uppercase tracking is prohibited.",
+        "section": "typography"
+      },
+      {
+        "name": "The Content Stays Solid Rule",
+        "body": "Workout data, nutrition values, care instructions, and history never sit on decorative glass.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One Prominent Action Rule",
+        "body": "A screen may have one glass-prominent or filled primary action; secondary actions use native lower-emphasis treatments.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do make the next useful action the strongest element on Today.",
+      "Do use native iOS navigation, controls, sheets, lists, and SF Symbols.",
+      "Do test every primary flow in bright light and dark appearance on the physical iPhone 16 Pro Max.",
+      "Do keep content opaque and reserve Liquid Glass for navigation and interactive action surfaces.",
+      "Do use Momentum Pulse only for action, selection, or earned emphasis.",
+      "Do preserve at least 44-by-44-point targets and Dynamic Type through accessibility sizes.",
+      "Do pair color with symbols, labels, patterns, or numeric values.",
+      "Do write direct, nonjudgmental copy that names the current state and next action.",
+      "Do keep ordinary surface corners between 10 and 16 points."
+    ],
+    "donts": [
+      "Don't build a gym-bro interface from black, neon green, flames, aggressive slogans, or pseudo-military language.",
+      "Don't use childish gamification with coins, cartoon mascots, confetti, streak freezes, or manipulative loss warnings.",
+      "Don't imitate sterile medical dashboards or make self-care feel diagnostic.",
+      "Don't transplant a web-dashboard card grid onto iPhone; nested cards, tiny labels, and custom global navigation are forbidden.",
+      "Don't use decorative glassmorphism, gradients, or motion that competes with logging.",
+      "Don't apply glass to every panel or create multiple ungrouped GlassEffectContainer instances.",
+      "Don't pair a one-point border with a wide soft shadow, use side-stripe accents, gradient text, or card radii above 16 points.",
+      "Don't use tiny uppercase tracked eyebrows, numbered decorative section markers, or hard-coded font sizes.",
+      "Don't use color alone for missed, skipped, due, recovery, complete, or target states.",
+      "Don't show a timer, estimated one-repetition maximum, diagnostic skincare claim, or automatic treatment progression."
+    ]
+  }
+}
