@@ -1,13 +1,61 @@
+import CloudKit
 import SwiftUI
 import SwiftData
+import UIKit
+import UserNotifications
 
 struct AppShell: View {
     @State private var selectedTab: AppTab = .today
+    @State private var notificationDelegate = MomentumNotificationDelegate()
+    @State private var pendingWorkoutRoute: WorkoutNotificationRoute?
+    @State private var pendingTimeZoneChange: MaterialTimeZoneChange?
     @Query private var settings: [AppSettingsRecord]
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        if settings.first?.onboardingCompleted == true {
+        if AppSettingsRecord.canonical(in: settings)?.onboardingCompleted == true {
             tabView
+                .preferredColorScheme(preferredColorScheme)
+                .onAppear {
+                    notificationDelegate.modelContext = modelContext
+                    notificationDelegate.onOpenToday = { selectedTab = .today }
+                    notificationDelegate.onStartWorkout = { route in
+                        selectedTab = .today
+                        pendingWorkoutRoute = route
+                    }
+                    UNUserNotificationCenter.current().delegate = notificationDelegate
+                    Task { await NotificationScheduler().configureCategories() }
+                    refreshCloudAccountState()
+                    evaluateTimeZoneAndReconcile()
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active else { return }
+                    refreshCloudAccountState()
+                    evaluateTimeZoneAndReconcile()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+                    evaluateTimeZoneAndReconcile()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .CKAccountChanged)) { _ in
+                    refreshCloudAccountState()
+                }
+                .alert(
+                    "Time zone changed",
+                    isPresented: timeZoneAlertIsPresented,
+                    presenting: pendingTimeZoneChange
+                ) { change in
+                    Button("Use New Time Zone") {
+                        MaterialTimeZoneChangeStore.accept(change)
+                        pendingTimeZoneChange = nil
+                        reconcile()
+                    }
+                    Button("Later", role: .cancel) {
+                        pendingTimeZoneChange = nil
+                    }
+                } message: { change in
+                    Text(timeZoneChangeMessage(change))
+                }
         } else {
             OnboardingView()
         }
@@ -16,7 +64,7 @@ struct AppShell: View {
     private var tabView: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                TodayView()
+                TodayView(notificationWorkoutRoute: $pendingWorkoutRoute)
             }
             .tabItem {
                 Label(AppTab.today.title, systemImage: AppTab.today.symbol)
@@ -24,7 +72,7 @@ struct AppShell: View {
             .tag(AppTab.today)
 
             NavigationStack {
-                PlaceholderTabView(title: AppTab.history.title, symbol: AppTab.history.symbol)
+                HistoryView()
             }
             .tabItem {
                 Label(AppTab.history.title, systemImage: AppTab.history.symbol)
@@ -32,7 +80,7 @@ struct AppShell: View {
             .tag(AppTab.history)
 
             NavigationStack {
-                PlaceholderTabView(title: AppTab.plans.title, symbol: AppTab.plans.symbol)
+                PlansView()
             }
             .tabItem {
                 Label(AppTab.plans.title, systemImage: AppTab.plans.symbol)
@@ -40,7 +88,7 @@ struct AppShell: View {
             .tag(AppTab.plans)
 
             NavigationStack {
-                PlaceholderTabView(title: AppTab.progress.title, symbol: AppTab.progress.symbol)
+                ProgressTabView()
             }
             .tabItem {
                 Label(AppTab.progress.title, systemImage: AppTab.progress.symbol)
@@ -49,26 +97,52 @@ struct AppShell: View {
         }
         .tint(MomentumTheme.pulse)
     }
-}
 
-private struct PlaceholderTabView: View {
-    let title: String
-    let symbol: String
-
-    var body: some View {
-        ContentUnavailableView(
-            title,
-            systemImage: symbol,
-            description: Text(description)
-        )
-        .navigationTitle(title)
+    private var preferredColorScheme: ColorScheme? {
+        switch AppSettingsRecord.canonical(in: settings)?.selectedAppearanceRaw {
+        case "light": .light
+        case "dark": .dark
+        default: nil
+        }
     }
 
-    private var description: String {
-        switch title {
-        case "History": "Completed days and the context around them will gather here."
-        case "Plans": "Tune your workout cycle, nutrition targets, and care routines here."
-        default: "Measurements, trends, and adherence will appear as you log your days."
+    private func reconcile() {
+        Task {
+            try? await DailyReconciler.reconcileAndNotify(in: modelContext)
         }
+    }
+
+    private func refreshCloudAccountState() {
+        Task {
+            try? await CloudAccountStateService.refresh(in: modelContext)
+        }
+    }
+
+    private func evaluateTimeZoneAndReconcile() {
+        if let change = MaterialTimeZoneChangeStore.evaluate() {
+            pendingTimeZoneChange = change
+        } else {
+            pendingTimeZoneChange = nil
+            reconcile()
+        }
+    }
+
+    private var timeZoneAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { pendingTimeZoneChange != nil },
+            set: { isPresented in
+                if !isPresented { pendingTimeZoneChange = nil }
+            }
+        )
+    }
+
+    private func timeZoneChangeMessage(_ change: MaterialTimeZoneChange) -> String {
+        let previous = timeZoneName(change.previousIdentifier)
+        let current = timeZoneName(change.currentIdentifier)
+        return "Momentum detected a move from \(previous) to \(current). Original timestamps stay unchanged. Use the new time zone to resume day, streak, schedule, and reminder reconciliation. Choose Later to keep logging while reconciliation remains deferred."
+    }
+
+    private func timeZoneName(_ identifier: String) -> String {
+        TimeZone(identifier: identifier)?.localizedName(for: .generic, locale: .current) ?? identifier
     }
 }

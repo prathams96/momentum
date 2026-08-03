@@ -34,17 +34,29 @@ public struct CompletedWorkoutSession: Equatable, Sendable {
     public let workoutTemplateID: UUID
     public let completionDomainDay: DomainDay
     public let finishedAt: Date
+    /// Historical cycle position used when the source template is later archived or removed.
+    public let sequenceIndexSnapshot: Int?
+    /// Historical recovery requirement used only when the source template no longer exists.
+    public let recoveryDaysAfterSnapshot: Int?
+    /// A stable successor snapshot takes precedence if the cycle is reordered after completion.
+    public let nextWorkoutTemplateIDSnapshot: UUID?
 
     public init(
         id: UUID,
         workoutTemplateID: UUID,
         completionDomainDay: DomainDay,
-        finishedAt: Date
+        finishedAt: Date,
+        sequenceIndexSnapshot: Int? = nil,
+        recoveryDaysAfterSnapshot: Int? = nil,
+        nextWorkoutTemplateIDSnapshot: UUID? = nil
     ) {
         self.id = id
         self.workoutTemplateID = workoutTemplateID
         self.completionDomainDay = completionDomainDay
         self.finishedAt = finishedAt
+        self.sequenceIndexSnapshot = sequenceIndexSnapshot
+        self.recoveryDaysAfterSnapshot = recoveryDaysAfterSnapshot
+        self.nextWorkoutTemplateIDSnapshot = nextWorkoutTemplateIDSnapshot
     }
 }
 
@@ -79,6 +91,7 @@ public enum ScheduleRepairReason: Equatable, Sendable {
     case invalidSequenceIndices
     case invalidRecoveryDays
     case completedSessionReferencesMissingWorkout
+    case duplicateActiveSessions
 }
 
 public enum WorkoutScheduleState: Equatable, Sendable {
@@ -109,15 +122,15 @@ public struct ScheduleEngine: Sendable {
         guard templates.allSatisfy({ $0.recoveryDaysAfter >= 0 }) else {
             return .needsRepair(reason: .invalidRecoveryDays)
         }
-        guard templates.contains(where: { $0.id == input.cycleAnchor.nextWorkoutID }) else {
-            return .needsRepair(reason: .missingAnchorWorkout)
-        }
         guard let latestSession = input.completedSessions.max(by: { lhs, rhs in
             if lhs.finishedAt != rhs.finishedAt {
                 return lhs.finishedAt < rhs.finishedAt
             }
             return lhs.id.uuidString < rhs.id.uuidString
         }) else {
+            guard templates.contains(where: { $0.id == input.cycleAnchor.nextWorkoutID }) else {
+                return .needsRepair(reason: .missingAnchorWorkout)
+            }
             return makeScheduleState(
                 workoutID: input.cycleAnchor.nextWorkoutID,
                 dueDay: input.cycleAnchor.firstDueDomainDay,
@@ -126,16 +139,35 @@ public struct ScheduleEngine: Sendable {
             )
         }
 
-        guard let completedIndex = templates.firstIndex(where: {
+        let nextWorkout: WorkoutTemplate
+        let recoveryDaysAfter: Int
+        if let completedIndex = templates.firstIndex(where: {
             $0.id == latestSession.workoutTemplateID
-        }) else {
-            return .needsRepair(reason: .completedSessionReferencesMissingWorkout)
+        }) {
+            let completedWorkout = templates[completedIndex]
+            nextWorkout = templates[(completedIndex + 1) % templates.count]
+            recoveryDaysAfter = completedWorkout.recoveryDaysAfter
+        } else {
+            guard let snapshotRecovery = latestSession.recoveryDaysAfterSnapshot,
+                  snapshotRecovery >= 0 else {
+                return .needsRepair(reason: .completedSessionReferencesMissingWorkout)
+            }
+
+            if let successorID = latestSession.nextWorkoutTemplateIDSnapshot,
+               let snapshottedSuccessor = templates.first(where: { $0.id == successorID }) {
+                nextWorkout = snapshottedSuccessor
+            } else if let snapshotIndex = latestSession.sequenceIndexSnapshot {
+                // Removing an item compacts contiguous active indices. The former successor
+                // therefore occupies the removed template's snapshotted position.
+                nextWorkout = templates.first(where: { $0.sequenceIndex >= snapshotIndex })
+                    ?? templates[0]
+            } else {
+                return .needsRepair(reason: .completedSessionReferencesMissingWorkout)
+            }
+            recoveryDaysAfter = snapshotRecovery
         }
-        let completedWorkout = templates[completedIndex]
-        let nextIndex = (completedIndex + 1) % templates.count
-        let nextWorkout = templates[nextIndex]
         let eligibleDay = latestSession.completionDomainDay.adding(
-            days: completedWorkout.recoveryDaysAfter + 1,
+            days: recoveryDaysAfter + 1,
             calendar: input.calendar
         )
 

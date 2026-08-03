@@ -34,6 +34,11 @@ targets:
     platform: iOS
     sources:
       - path: MomentumTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
     dependencies:
       - target: Momentum
 
@@ -42,5 +47,10 @@ targets:
     platform: iOS
     sources:
       - path: MomentumUITests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
     dependencies:
       - target: Momentum

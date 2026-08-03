@@ -1,21 +1,35 @@
+import CloudKit
 import MomentumCore
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settings: [AppSettingsRecord]
+    @Query private var nutritionTargets: [NutritionTargetRecord]
     @Query(sort: \WorkoutTemplateRecord.sequenceIndex) private var workouts: [WorkoutTemplateRecord]
     @Query private var anchors: [CycleAnchorRecord]
+    @Query(sort: \CareRoutineTemplateRecord.notificationMinutes) private var routines: [CareRoutineTemplateRecord]
 
     @State private var step = 0
+    @State private var selectedWorkoutID: UUID?
     @State private var dueToday = true
     @State private var calorieTarget = "2400"
     @State private var calorieMinimum = "2300"
     @State private var calorieMaximum = "2500"
     @State private var proteinMinimum = "150"
+    @State private var hairCareMinutes = 480
+    @State private var morningCareMinutes = 540
+    @State private var nightCareMinutes = 1_320
+    @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var iCloudState: ICloudState = .checking
+    @State private var isFinishing = false
+    @State private var presentedAlert: OnboardingAlert?
+    @State private var hasPreparedDrafts = false
 
     private let stepCount = 3
+    private let notificationScheduler = NotificationScheduler()
 
     var body: some View {
         NavigationStack {
@@ -47,6 +61,30 @@ struct OnboardingView: View {
                             }
                         }
                     }
+                }
+            }
+            .task(id: "\(workouts.count)-\(routines.count)") {
+                prepareDraftsIfNeeded()
+                await refreshNotificationStatus()
+                await refreshICloudState()
+            }
+            .alert(item: $presentedAlert) { alert in
+                switch alert {
+                case .saveFailed:
+                    Alert(
+                        title: Text("Setup could not be saved"),
+                        message: Text("Your choices are still here. Try saving them again."),
+                        primaryButton: .default(Text("Try again")) {
+                            Task { await completeOnboarding() }
+                        },
+                        secondaryButton: .cancel(Text("Not now"))
+                    )
+                case .notificationsUnavailable:
+                    Alert(
+                        title: Text("Notifications are unavailable"),
+                        message: Text("Momentum will keep working without reminders. You can try again later."),
+                        dismissButton: .default(Text("Continue"))
+                    )
                 }
             }
         }
@@ -113,38 +151,45 @@ struct OnboardingView: View {
                 Text("Your cycle, in sequence")
                     .font(.title.bold())
 
-                Text("Four workouts move forward one completion at a time. Recovery days never reset the order.")
+                Text("Choose the workout that comes next. The cycle then moves forward one completion at a time, with recovery in between.")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
 
             VStack(spacing: 0) {
                 ForEach(Array(workouts.enumerated()), id: \.element.id) { index, workout in
-                    HStack(spacing: MomentumSpacing.md) {
-                        Text("\(index + 1)")
-                            .font(.headline.monospacedDigit())
-                            .foregroundStyle(index == 0 ? MomentumTheme.pulse : .secondary)
-                            .frame(width: 28, height: 28)
-                            .background(index == 0 ? MomentumTheme.pulseWash : Color.secondary.opacity(0.10))
-                            .clipShape(Circle())
+                    Button {
+                        selectedWorkoutID = workout.id
+                    } label: {
+                        HStack(spacing: MomentumSpacing.md) {
+                            Text("\(index + 1)")
+                                .font(.headline.monospacedDigit())
+                                .foregroundStyle(selectedWorkoutID == workout.id ? MomentumTheme.pulse : .secondary)
+                                .frame(width: 28, height: 28)
+                                .background(selectedWorkoutID == workout.id ? MomentumTheme.pulseWash : Color.secondary.opacity(0.10))
+                                .clipShape(Circle())
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(workout.name)
-                                .font(.headline)
-                            Text(workout.focus)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(workout.name)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                Text(workout.focus)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+
+                            Spacer(minLength: 0)
+
+                            Image(systemName: selectedWorkoutID == workout.id ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundStyle(selectedWorkoutID == workout.id ? MomentumTheme.pulse : .secondary)
+                                .accessibilityHidden(true)
                         }
-
-                        Spacer(minLength: 0)
-
-                        if index == 0 {
-                            Text("Next")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(MomentumTheme.pulseDeep)
-                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Make \(workout.name) the next workout")
                     .padding(.vertical, MomentumSpacing.md)
 
                     if index < workouts.count - 1 {
@@ -156,6 +201,27 @@ struct OnboardingView: View {
             .padding(.horizontal, MomentumSpacing.md)
             .background(Color(uiColor: .secondarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+                Text("Your care plan")
+                    .font(.title3.bold())
+
+                CarePreviewRow(
+                    symbol: "sun.max",
+                    title: "Morning care",
+                    detail: "A daily cleanse choice, moisturizer, and SPF 50 sunscreen"
+                )
+                CarePreviewRow(
+                    symbol: "moon",
+                    title: "Night care",
+                    detail: "A routine that changes by day and never progresses automatically"
+                )
+                CarePreviewRow(
+                    symbol: "drop",
+                    title: "Hair care",
+                    detail: "An alternating 3/4-day routine that rolls forward when missed"
+                )
+            }
         }
     }
 
@@ -173,7 +239,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
                 Toggle(isOn: $dueToday) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Upper A is due today")
+                        Text("\(selectedWorkoutName) is due today")
                             .font(.headline)
                         Text("Turn this off to start your first day tomorrow.")
                             .font(.subheadline)
@@ -196,18 +262,123 @@ struct OnboardingView: View {
                     NutritionField(label: "Range to", value: $calorieMaximum, suffix: "kcal")
                 }
                 NutritionField(label: "Protein minimum", value: $proteinMinimum, suffix: "g")
+
+                if !nutritionValidationMessages.isEmpty {
+                    VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
+                        ForEach(nutritionValidationMessages, id: \.self) { message in
+                            Label(message, systemImage: "exclamationmark.circle")
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+                VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
+                    Text("Care reminders")
+                        .font(.headline)
+                    Text("Choose times that fit your day. These reminders can be changed later.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+
+                ReminderTimeField(
+                    label: "Hair care",
+                    detail: "When the alternating routine is due",
+                    minutes: $hairCareMinutes
+                )
+                ReminderTimeField(
+                    label: "Morning care",
+                    detail: "Daily",
+                    minutes: $morningCareMinutes
+                )
+                ReminderTimeField(
+                    label: "Night care",
+                    detail: "Daily routine for the current weekday",
+                    minutes: $nightCareMinutes
+                )
+            }
+
+            notificationPermissionSection
+            iCloudSection
+        }
+    }
+
+    private var notificationPermissionSection: some View {
+        VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+            Label("Reminders, only when useful", systemImage: "bell.badge")
+                .font(.headline)
+
+            Text("Momentum uses local reminders for care and a due workout. Denying permission never blocks the app.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+
+            switch notificationStatus {
+            case .notDetermined:
+                Button("Allow notifications") {
+                    Task { await requestNotificationPermission() }
+                }
+                .buttonStyle(.bordered)
+            case .denied:
+                Label("Notifications are off. You can enable them later in Settings.", systemImage: "bell.slash")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            case .authorized, .provisional, .ephemeral:
+                Label("Notifications are ready", systemImage: "checkmark.circle.fill")
+                    .font(.body)
+                    .foregroundStyle(MomentumTheme.success)
+            @unknown default:
+                Text("Notification status is unavailable. Momentum will continue without reminders.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
             }
         }
+        .padding(MomentumSpacing.md)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var iCloudSection: some View {
+        VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+            Label(iCloudState.title, systemImage: iCloudState.symbol)
+                .font(.headline)
+
+            Text(iCloudState.detail)
+                .font(.body)
+                .foregroundStyle(.secondary)
+
+            if iCloudState != .available {
+                Text("You can continue locally now. Momentum will use your private iCloud storage when it becomes available.")
+                    .font(.body)
+            }
+        }
+        .padding(MomentumSpacing.md)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private var footer: some View {
         Button(action: advance) {
-            Text(buttonTitle)
-                .frame(maxWidth: .infinity)
+            Group {
+                if isFinishing {
+                    ProgressView()
+                        .accessibilityLabel("Saving setup")
+                } else {
+                    Text(buttonTitle)
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
         .tint(MomentumTheme.pulse)
         .controlSize(.large)
+        .disabled(
+            isFinishing ||
+            (step == 1 && selectedWorkoutID == nil) ||
+            (step == stepCount - 1 && !nutritionValidationMessages.isEmpty)
+        )
         .accessibilityHint(step == stepCount - 1 ? "Completes onboarding" : "Moves to the next setup step")
     }
 
@@ -222,14 +393,14 @@ struct OnboardingView: View {
     private var buttonTitle: String {
         switch step {
         case 0: "See the plan"
-        case 1: "Keep Upper A next"
-        default: "Start with Upper A"
+        case 1: "Keep \(selectedWorkoutName) next"
+        default: "Start with \(selectedWorkoutName)"
         }
     }
 
     private func advance() {
         guard step < stepCount - 1 else {
-            completeOnboarding()
+            Task { await completeOnboarding() }
             return
         }
 
@@ -238,33 +409,326 @@ struct OnboardingView: View {
         }
     }
 
-    private func completeOnboarding() {
-        guard let settings = settings.first else { return }
+    private var selectedWorkoutName: String {
+        workouts.first { $0.id == selectedWorkoutID }?.name ?? "Upper A"
+    }
+
+    private var nutritionValidationMessages: [String] {
+        var messages: [String] = []
+        guard
+            let target = Int(calorieTarget),
+            let minimum = Int(calorieMinimum),
+            let maximum = Int(calorieMaximum),
+            let protein = Int(proteinMinimum)
+        else {
+            return ["Enter whole numbers for each nutrition starting point."]
+        }
+
+        if target <= 0 || minimum <= 0 || maximum <= 0 || protein <= 0 {
+            messages.append("Calories and protein must be greater than zero.")
+        }
+        if minimum > maximum {
+            messages.append("The calorie range must start below its upper limit.")
+        } else if !(minimum...maximum).contains(target) {
+            messages.append("The daily calorie target must sit inside the calorie range.")
+        }
+        return messages
+    }
+
+    private func prepareDraftsIfNeeded() {
+        guard !hasPreparedDrafts else { return }
+        hasPreparedDrafts = true
+
+        if let target = nutritionTargets.max(by: { $0.effectiveFrom < $1.effectiveFrom }) {
+            calorieTarget = String(target.calorieDisplayTarget)
+            calorieMinimum = String(target.calorieMinimum)
+            calorieMaximum = String(target.calorieMaximum)
+            proteinMinimum = String(target.proteinMinimumGrams)
+        }
+
+        let anchor = anchors.max(by: { $0.updatedAt < $1.updatedAt })
+        selectedWorkoutID = workouts.first(where: { $0.id == anchor?.nextWorkoutTemplateID })?.id
+            ?? workouts.first?.id
+
+        if let hairCare = routines.first(where: { $0.name == "Hair care" }) {
+            hairCareMinutes = hairCare.notificationMinutes
+        }
+        if let morningCare = routines.first(where: { $0.name == "Morning care" }) {
+            morningCareMinutes = morningCare.notificationMinutes
+        }
+        if let nightCare = routines.first(where: { $0.name.hasPrefix("Night care") }) {
+            nightCareMinutes = nightCare.notificationMinutes
+        }
+    }
+
+    private func refreshNotificationStatus() async {
+        if isUsingPreviewStore {
+            notificationStatus = .authorized
+            return
+        }
+        await notificationScheduler.configureCategories()
+        notificationStatus = await notificationScheduler.authorizationStatus()
+    }
+
+    private func requestNotificationPermission(showError: Bool = true) async {
+        if isUsingPreviewStore {
+            notificationStatus = .authorized
+            return
+        }
+
+        do {
+            _ = try await notificationScheduler.requestAuthorization()
+            notificationStatus = await notificationScheduler.authorizationStatus()
+        } catch {
+            notificationStatus = await notificationScheduler.authorizationStatus()
+            if showError {
+                presentedAlert = .notificationsUnavailable
+            }
+        }
+    }
+
+    private func refreshICloudState() async {
+        if isUsingPreviewStore {
+            iCloudState = .available
+            return
+        }
+
+        #if targetEnvironment(simulator)
+        iCloudState = .unavailable
+        return
+        #else
+
+        do {
+            switch try await CKContainer(identifier: "iCloud.com.pratham.momentum").accountStatus() {
+            case .available:
+                iCloudState = .available
+            case .noAccount:
+                iCloudState = .noAccount
+            case .restricted:
+                iCloudState = .restricted
+            case .couldNotDetermine, .temporarilyUnavailable:
+                iCloudState = .unavailable
+            @unknown default:
+                iCloudState = .unavailable
+            }
+        } catch {
+            iCloudState = .unavailable
+        }
+        #endif
+    }
+
+    private func completeOnboarding() async {
+        guard
+            nutritionValidationMessages.isEmpty,
+            let selectedWorkoutID,
+            let calorieTarget = Int(calorieTarget),
+            let calorieMinimum = Int(calorieMinimum),
+            let calorieMaximum = Int(calorieMaximum),
+            let proteinMinimum = Int(proteinMinimum),
+            let settings = AppSettingsRecord.canonical(in: settings)
+        else { return }
+
+        isFinishing = true
+        defer { isFinishing = false }
+
+        if notificationStatus == .notDetermined {
+            await requestNotificationPermission(showError: false)
+        }
+
+        let originalSettings = (onboardingCompleted: settings.onboardingCompleted, updatedAt: settings.updatedAt)
+        let anchor = anchors.max(by: { $0.updatedAt < $1.updatedAt })
+        let originalAnchor = anchor.map {
+            (nextWorkoutTemplateID: $0.nextWorkoutTemplateID, firstDueDomainDay: $0.firstDueDomainDay, updatedAt: $0.updatedAt)
+        }
+        let originalRoutines = routines.map {
+            (record: $0, notificationMinutes: $0.notificationMinutes, updatedAt: $0.updatedAt)
+        }
+        let calendar = Calendar.autoupdatingCurrent
+        let currentDay = DomainDay.containing(
+            .now,
+            calendar: calendar,
+            cutoffMinutes: settings.domainDayCutoffMinutes
+        )
+        let effectiveFrom = PersistedDomainDay.encode(currentDay)
+        let existingTarget = nutritionTargets.first { $0.effectiveFrom == effectiveFrom }
+        let priorOpenTarget = nutritionTargets
+            .filter { $0.id != existingTarget?.id && $0.effectiveTo == nil && $0.effectiveFrom < effectiveFrom }
+            .max { $0.effectiveFrom < $1.effectiveFrom }
+        let originalPriorTargetEnd = priorOpenTarget?.effectiveTo
+        let target = existingTarget ?? NutritionTargetRecord(effectiveFrom: effectiveFrom)
+        if existingTarget == nil {
+            modelContext.insert(target)
+        }
+        if let priorOpenTarget {
+            priorOpenTarget.effectiveTo = PersistedDomainDay.encode(currentDay.adding(days: -1, calendar: calendar))
+            priorOpenTarget.updatedAt = .now
+        }
 
         settings.onboardingCompleted = true
-        settings.calorieTarget = Int(calorieTarget) ?? 2400
-        settings.calorieMinimum = Int(calorieMinimum) ?? 2300
-        settings.calorieMaximum = Int(calorieMaximum) ?? 2500
-        settings.proteinMinimum = Int(proteinMinimum) ?? 150
         settings.updatedAt = .now
 
-        if let anchor = anchors.first {
-            let calendar = Calendar.autoupdatingCurrent
-            let currentDay = DomainDay.containing(
-                .now,
-                calendar: calendar,
-                cutoffMinutes: settings.domainDayCutoffMinutes
-            )
+        target.calorieDisplayTarget = calorieTarget
+        target.calorieMinimum = calorieMinimum
+        target.calorieMaximum = calorieMaximum
+        target.proteinMinimumGrams = proteinMinimum
+        target.updatedAt = .now
+
+        if let anchor {
             let dueDay = dueToday ? currentDay : currentDay.adding(days: 1, calendar: calendar)
+            anchor.nextWorkoutTemplateID = selectedWorkoutID
             anchor.firstDueDomainDay = encode(dueDay)
             anchor.updatedAt = .now
         }
 
-        try? modelContext.save()
+        for routine in routines {
+            switch routine.name {
+            case "Hair care":
+                routine.notificationMinutes = hairCareMinutes
+            case "Morning care":
+                routine.notificationMinutes = morningCareMinutes
+            case let name where name.hasPrefix("Night care"):
+                routine.notificationMinutes = nightCareMinutes
+            default:
+                continue
+            }
+            routine.updatedAt = .now
+        }
+
+        do {
+            try modelContext.save()
+        } catch {
+            settings.onboardingCompleted = originalSettings.onboardingCompleted
+            settings.updatedAt = originalSettings.updatedAt
+            if existingTarget == nil {
+                modelContext.delete(target)
+            }
+            priorOpenTarget?.effectiveTo = originalPriorTargetEnd
+            if let anchor, let originalAnchor {
+                anchor.nextWorkoutTemplateID = originalAnchor.nextWorkoutTemplateID
+                anchor.firstDueDomainDay = originalAnchor.firstDueDomainDay
+                anchor.updatedAt = originalAnchor.updatedAt
+            }
+            for original in originalRoutines {
+                original.record.notificationMinutes = original.notificationMinutes
+                original.record.updatedAt = original.updatedAt
+            }
+            presentedAlert = .saveFailed
+        }
+    }
+
+    private var isUsingPreviewStore: Bool {
+        ProcessInfo.processInfo.arguments.contains("-usePreviewStore")
     }
 
     private func encode(_ day: DomainDay) -> String {
         "\(day.year)-\(String(format: "%02d", day.month))-\(String(format: "%02d", day.day))"
+    }
+}
+
+private enum OnboardingAlert: String, Identifiable {
+    case saveFailed
+    case notificationsUnavailable
+
+    var id: String { rawValue }
+}
+
+private enum ICloudState: Equatable {
+    case checking
+    case available
+    case noAccount
+    case restricted
+    case unavailable
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .checking: "Checking iCloud"
+        case .available: "Private iCloud sync is ready"
+        case .noAccount: "iCloud is not signed in"
+        case .restricted: "iCloud access is restricted"
+        case .unavailable: "iCloud is temporarily unavailable"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .checking: "icloud"
+        case .available: "icloud.fill"
+        case .noAccount, .restricted, .unavailable: "icloud.slash"
+        }
+    }
+
+    var detail: LocalizedStringKey {
+        switch self {
+        case .checking:
+            "Momentum is checking whether private sync is available."
+        case .available:
+            "Your routine stays available on this iPhone and can sync through your private iCloud storage."
+        case .noAccount:
+            "Sign in to iCloud in the Settings app whenever you want private sync."
+        case .restricted:
+            "This device does not currently allow iCloud access for Momentum."
+        case .unavailable:
+            "Your routine remains available on this iPhone while iCloud is unavailable."
+        }
+    }
+}
+
+private struct CarePreviewRow: View {
+    let symbol: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: MomentumSpacing.md) {
+            Image(systemName: symbol)
+                .font(.headline)
+                .foregroundStyle(MomentumTheme.pulse)
+                .frame(width: 32, height: 32)
+                .background(MomentumTheme.pulseWash)
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                Text(detail)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ReminderTimeField: View {
+    let label: String
+    let detail: String
+    @Binding var minutes: Int
+
+    var body: some View {
+        DatePicker(selection: timeBinding, displayedComponents: .hourAndMinute) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.body.weight(.semibold))
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .datePickerStyle(.compact)
+    }
+
+    private var timeBinding: Binding<Date> {
+        Binding(
+            get: {
+                Calendar.autoupdatingCurrent.date(
+                    from: DateComponents(hour: minutes / 60, minute: minutes % 60)
+                ) ?? .now
+            },
+            set: { date in
+                let components = Calendar.autoupdatingCurrent.dateComponents([.hour, .minute], from: date)
+                minutes = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+            }
+        )
     }
 }
 
