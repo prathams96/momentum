@@ -117,13 +117,35 @@ struct TodayView: View {
         HistoryProjection.streaks(facts: adherenceFacts, calendar: calendar)
     }
 
+    private var dailyThreadFocus: DailyThreadFocus {
+        switch scheduleState {
+        case .active, .due, .needsRepair:
+            return .workout
+        case .recovery:
+            if nutritionDay?.finalizedAt == nil {
+                return .food
+            }
+            if todayCareOccurrences.contains(where: { !["completed", "skipped"].contains($0.statusRaw) }) {
+                return .care
+            }
+            return .reflect
+        }
+    }
+
+    private var dailyThreadCallout: String {
+        if case .needsRepair = scheduleState {
+            return "Repair workout plan"
+        }
+        return "\(dailyThreadFocus.title) next"
+    }
+
     var body: some View {
         repairConfirmationContent
     }
 
     private var mainContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: MomentumSpacing.xxl) {
+            VStack(alignment: .leading, spacing: MomentumSpacing.xl) {
                 dateLine
                 workoutSection
                 nutritionSection
@@ -132,7 +154,7 @@ struct TodayView: View {
             }
             .padding(.horizontal, MomentumSpacing.md)
             .padding(.top, MomentumSpacing.xs)
-            .padding(.bottom, MomentumSpacing.xl)
+            .padding(.bottom, 96)
         }
         .background(Color(uiColor: .systemBackground))
         .navigationTitle("Today")
@@ -267,16 +289,18 @@ struct TodayView: View {
     }
 
     private var dateLine: some View {
-        Text(PersistedDomainDay.date(for: currentDomainDay, calendar: calendar)?.formatted(date: .complete, time: .omitted) ?? "Today")
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.secondary)
-            .accessibilityAddTraits(.isHeader)
+        DailyThreadHeader(
+            date: PersistedDomainDay.date(for: currentDomainDay, calendar: calendar)?.formatted(date: .complete, time: .omitted) ?? "Today",
+            accessibilityDate: PersistedDomainDay.date(for: currentDomainDay, calendar: calendar)?.formatted(date: .abbreviated, time: .omitted) ?? "Today",
+            focus: dailyThreadFocus,
+            callout: dailyThreadCallout
+        )
     }
 
     @ViewBuilder
     private var workoutSection: some View {
         VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-            Text("Next")
+            Text("Next up")
                 .font(.title3.bold())
 
             switch scheduleState {
@@ -304,8 +328,9 @@ struct TodayView: View {
                     workoutCard(
                         workout: workout,
                         title: "Recovery · \(daysRemaining) day\(daysRemaining == 1 ? "" : "s") left",
-                        detail: "You can start early if today feels right.",
+                        detail: "Next eligible \(formatted(eligibleDay)). Start early only if recovery feels complete.",
                         buttonTitle: "Start early",
+                        prominent: false,
                         action: {
                             pendingEarlyStart = EarlyStartRequest(
                                 workoutID: workout.id,
@@ -336,56 +361,65 @@ struct TodayView: View {
         title: String,
         detail: String,
         buttonTitle: String,
+        prominent: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-                HStack(alignment: .top, spacing: MomentumSpacing.md) {
-                    VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
-                        Text(title)
-                            .font(.headline)
-                            .foregroundStyle(MomentumTheme.pulse)
-                        Text(workout?.name ?? "Workout")
-                            .font(.largeTitle.bold())
-                            .foregroundStyle(.primary)
-                            .minimumScaleFactor(0.85)
-                        ThreadUnderline()
-                            .stroke(MomentumTheme.pulse, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .frame(width: 112, height: 12)
-                    }
+            VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
+                HStack(alignment: .firstTextBaseline, spacing: MomentumSpacing.sm) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
                     Spacer(minLength: 0)
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .font(.title2)
-                        .foregroundStyle(MomentumTheme.pulse)
-                        .frame(width: 48, height: 48)
-                        .background(Color(uiColor: .systemBackground).opacity(0.70))
-                        .clipShape(Circle())
-                }
-
-                Text(detail)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack {
                     if let workout {
                         Label("\(exerciseCount(for: workout)) exercises", systemImage: "list.number")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
+                }
+
+                HStack(alignment: .center, spacing: MomentumSpacing.md) {
+                    Text(workout?.name ?? "Workout")
+                        .font(.title2.bold())
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(MomentumTheme.pulse)
+                        .frame(width: 44, height: 44)
+                        .background(MomentumTheme.pulseWash)
+                        .clipShape(Circle())
+                }
+
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
+
+                HStack(spacing: MomentumSpacing.sm) {
+                    Image(systemName: buttonTitle == "Resume workout" ? "play.fill" : "arrow.right")
+                        .accessibilityHidden(true)
                     Text(buttonTitle)
                         .font(.headline)
-                        .foregroundStyle(.white)
+                    Spacer(minLength: 0)
                 }
-                .padding(.vertical, MomentumSpacing.sm)
+                .foregroundStyle(prominent ? Color.white : MomentumTheme.pulse)
+                .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
                 .padding(.horizontal, MomentumSpacing.md)
-                .background(MomentumTheme.pulse)
+                .background(prominent ? MomentumTheme.pulse : MomentumTheme.pulseWash)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay {
+                    if !prominent {
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(MomentumTheme.pulse.opacity(0.35), lineWidth: 1)
+                    }
+                }
             }
             .padding(MomentumSpacing.md)
-            .background(MomentumTheme.pulseWash)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .background(Color(uiColor: .secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
         .accessibilityHint("\(buttonTitle)\(workout.map { " \($0.name)" } ?? "")")
@@ -461,7 +495,7 @@ struct TodayView: View {
 
     private var activitySection: some View {
         VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-            Text("Keep the day moving")
+            Text("Care")
                 .font(.title3.bold())
 
             VStack(spacing: 0) {
@@ -501,25 +535,35 @@ struct TodayView: View {
                 Text("Nutrition")
                     .font(.title3.bold())
                 Spacer()
-                Text(nutritionDay?.finalizedAt == nil ? "Open" : "Finalized")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(nutritionDay?.finalizedAt == nil ? .secondary : MomentumTheme.success)
+                Button("Log food", systemImage: "plus") { openFoodEntry(nil) }
+                    .buttonStyle(.bordered)
+                    .tint(MomentumTheme.pulse)
+                    .frame(minHeight: 44)
             }
 
-            VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
-                HStack {
-                    nutritionMetric(
-                        title: "Calories",
-                        value: "\(DecimalFormatter.whole(nutritionTotals.calories)) kcal",
-                        detail: target.map { "Range \($0.calorieMinimum)–\($0.calorieMaximum)" } ?? "Set a target in Plans"
-                    )
-                    Spacer()
-                    nutritionMetric(
-                        title: "Protein",
-                        value: "\(DecimalFormatter.onePlace(nutritionTotals.proteinGrams)) g",
-                        detail: target.map { "Minimum \($0.proteinMinimumGrams) g" } ?? "Set a target in Plans"
-                    )
-                }
+            VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+                NutritionGoalRow(
+                    title: "Calories",
+                    value: "\(DecimalFormatter.whole(nutritionTotals.calories)) kcal",
+                    target: target.map { "\($0.calorieMinimum)–\($0.calorieMaximum) kcal" } ?? "Set a target in Plans",
+                    visualization: .range(
+                        current: NSDecimalNumber(decimal: nutritionTotals.calories).doubleValue,
+                        minimum: Double(target?.calorieMinimum ?? 0),
+                        maximum: Double(target?.calorieMaximum ?? 0)
+                    ),
+                    tint: MomentumTheme.success
+                )
+
+                NutritionGoalRow(
+                    title: "Protein",
+                    value: "\(DecimalFormatter.onePlace(nutritionTotals.proteinGrams)) g",
+                    target: target.map { "\($0.proteinMinimumGrams) g minimum" } ?? "Set a target in Plans",
+                    visualization: .threshold(
+                        current: NSDecimalNumber(decimal: nutritionTotals.proteinGrams).doubleValue,
+                        minimum: Double(target?.proteinMinimumGrams ?? 0)
+                    ),
+                    tint: MomentumTheme.dataCyan
+                )
 
                 if let evaluation {
                     Label(
@@ -568,27 +612,13 @@ struct TodayView: View {
                 }
             }
 
-            HStack {
-                Button("Log food", systemImage: "plus") { openFoodEntry(nil) }
-                    .buttonStyle(.bordered)
-                    .tint(MomentumTheme.pulse)
-                Spacer()
-                Button(
-                    nutritionDay?.finalizedAt == nil ? "Finish logging today" : "Reopen",
-                    systemImage: nutritionDay?.finalizedAt == nil ? "checkmark" : "arrow.uturn.backward"
-                ) {
-                    toggleNutritionFinalization()
-                }
-                .buttonStyle(.bordered)
+            Button(
+                nutritionDay?.finalizedAt == nil ? "Finish logging today" : "Reopen nutrition",
+                systemImage: nutritionDay?.finalizedAt == nil ? "checkmark" : "arrow.uturn.backward"
+            ) {
+                toggleNutritionFinalization()
             }
-        }
-    }
-
-    private func nutritionMetric(title: String, value: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-            Text(value).font(.title3.monospacedDigit().weight(.bold))
-            Text(detail).font(.caption).foregroundStyle(.secondary)
+            .buttonStyle(.bordered)
         }
     }
 
@@ -703,6 +733,12 @@ struct TodayView: View {
                 $0.routineRoleRaw == "postWorkout"
             }
             .sorted { $0.dueAt < $1.dueAt }
+    }
+
+    private var todayCareOccurrences: [CareOccurrenceRecord] {
+        occurrences.filter {
+            $0.dueDomainDay == PersistedDomainDay.encode(currentDomainDay)
+        }
     }
 
     private func occurrence(where predicate: (CareOccurrenceRecord) -> Bool) -> CareOccurrenceRecord? {
@@ -849,15 +885,288 @@ private struct ActivityRow: View {
     }
 }
 
-private struct ThreadUnderline: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
-        path.addCurve(
-            to: CGPoint(x: rect.maxX, y: rect.midY),
-            control1: CGPoint(x: rect.width * 0.30, y: rect.minY),
-            control2: CGPoint(x: rect.width * 0.70, y: rect.maxY)
-        )
-        return path
+private enum DailyThreadFocus: Int, CaseIterable, Identifiable {
+    case workout
+    case food
+    case care
+    case reflect
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .workout: "Workout"
+        case .food: "Food"
+        case .care: "Care"
+        case .reflect: "Reflect"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .workout: "figure.strengthtraining.traditional"
+        case .food: "fork.knife"
+        case .care: "sparkles"
+        case .reflect: "chart.xyaxis.line"
+        }
+    }
+}
+
+private struct DailyThreadHeader: View {
+    let date: String
+    let accessibilityDate: String
+    let focus: DailyThreadFocus
+    let callout: String
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var threadNodeSize = 28
+    @State private var isRevealed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+            VStack(alignment: .leading, spacing: MomentumSpacing.xxs) {
+                Text(dynamicTypeSize.isAccessibilitySize ? accessibilityDate : date)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
+                        promise
+                        focusLabel
+                    }
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: MomentumSpacing.sm) {
+                        promise
+
+                        Spacer(minLength: 0)
+
+                        focusLabel
+                    }
+                }
+            }
+
+            if dynamicTypeSize.isAccessibilitySize {
+                accessibilityThread
+            } else {
+                standardThread
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Daily thread")
+        .accessibilityValue("\(accessibilityDate). One promise. Every day. \(callout). Workout, food, care, then reflect.")
+        .onAppear {
+            guard !isRevealed else { return }
+            if reduceMotion {
+                isRevealed = true
+            } else {
+                withAnimation(.easeOut(duration: 0.48)) {
+                    isRevealed = true
+                }
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: focus)
+    }
+
+    private var focusedNodeSize: CGFloat {
+        threadNodeSize + 4
+    }
+
+    private var standardThread: some View {
+        ZStack(alignment: .top) {
+            GeometryReader { proxy in
+                Capsule()
+                    .fill(Color.secondary.opacity(0.20))
+                    .frame(width: max(proxy.size.width - 52, 0), height: 2)
+                    .offset(x: 26, y: focusedNodeSize / 2)
+                    .scaleEffect(x: isRevealed ? 1 : 0.02, anchor: .leading)
+            }
+
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(DailyThreadFocus.allCases) { stage in
+                    DailyThreadStage(
+                        stage: stage,
+                        isFocused: stage == focus,
+                        isRevealed: isRevealed,
+                        nodeSize: threadNodeSize
+                    )
+                }
+            }
+        }
+        .frame(height: max(focusedNodeSize + 24, 56))
+    }
+
+    private var accessibilityThread: some View {
+        LazyVGrid(
+            columns: [GridItem(.flexible()), GridItem(.flexible())],
+            spacing: MomentumSpacing.md
+        ) {
+            ForEach(DailyThreadFocus.allCases) { stage in
+                DailyThreadStage(
+                    stage: stage,
+                    isFocused: stage == focus,
+                    isRevealed: isRevealed,
+                    nodeSize: min(threadNodeSize, 52)
+                )
+            }
+        }
+        .background {
+            GeometryReader { proxy in
+                Path { path in
+                    let top = min(threadNodeSize, 52) / 2
+                    let bottom = proxy.size.height - top - 34
+                    path.move(to: CGPoint(x: proxy.size.width * 0.25, y: top))
+                    path.addLine(to: CGPoint(x: proxy.size.width * 0.75, y: top))
+                    path.addCurve(
+                        to: CGPoint(x: proxy.size.width * 0.25, y: bottom),
+                        control1: CGPoint(x: proxy.size.width * 0.88, y: proxy.size.height * 0.45),
+                        control2: CGPoint(x: proxy.size.width * 0.12, y: proxy.size.height * 0.55)
+                    )
+                    path.addLine(to: CGPoint(x: proxy.size.width * 0.75, y: bottom))
+                }
+                .trim(from: 0, to: isRevealed ? 1 : 0.02)
+                .stroke(Color.secondary.opacity(0.20), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+        }
+    }
+
+    private var promise: some View {
+        Text("One promise. Every day.")
+            .font(.title2.bold())
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var focusLabel: some View {
+        Label(callout, systemImage: "arrow.right")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(MomentumTheme.pulse)
+            .labelStyle(.titleAndIcon)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct DailyThreadStage: View {
+    let stage: DailyThreadFocus
+    let isFocused: Bool
+    let isRevealed: Bool
+    let nodeSize: CGFloat
+
+    var body: some View {
+        VStack(spacing: MomentumSpacing.xxs) {
+            ZStack {
+                Circle()
+                    .fill(isFocused ? MomentumTheme.pulse : Color(uiColor: .secondarySystemBackground))
+                    .frame(
+                        width: isFocused ? nodeSize + 4 : nodeSize,
+                        height: isFocused ? nodeSize + 4 : nodeSize
+                    )
+
+                Image(systemName: stage.symbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isFocused ? Color.white : Color.secondary)
+            }
+            .scaleEffect(isFocused && !isRevealed ? 0.78 : 1)
+
+            Text(stage.title)
+                .font(.caption.weight(isFocused ? .semibold : .regular))
+                .foregroundStyle(isFocused ? MomentumTheme.pulse : Color.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityHidden(true)
+    }
+}
+
+private enum NutritionGoalVisualization {
+    case range(current: Double, minimum: Double, maximum: Double)
+    case threshold(current: Double, minimum: Double)
+
+    var current: Double {
+        switch self {
+        case let .range(current, _, _), let .threshold(current, _): current
+        }
+    }
+
+    var scaleMaximum: Double {
+        switch self {
+        case let .range(current, _, maximum): max(current, maximum * 1.08, 1)
+        case let .threshold(current, minimum): max(current, minimum * 1.25, 1)
+        }
+    }
+
+    var highlightedRange: ClosedRange<Double> {
+        switch self {
+        case let .range(_, minimum, maximum): minimum...max(minimum, maximum)
+        case let .threshold(_, minimum): 0...minimum
+        }
+    }
+}
+
+private struct NutritionGoalRow: View {
+    let title: String
+    let value: String
+    let target: String
+    let visualization: NutritionGoalVisualization
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: MomentumSpacing.md)
+                Text(value)
+                    .font(.headline.monospacedDigit())
+            }
+
+            NutritionGoalTrack(visualization: visualization, tint: tint)
+
+            Text(target)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue("\(value), target \(target)")
+    }
+}
+
+private struct NutritionGoalTrack: View {
+    let visualization: NutritionGoalVisualization
+    let tint: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let maximum = visualization.scaleMaximum
+            let range = visualization.highlightedRange
+            let start = min(max(range.lowerBound / maximum, 0), 1) * width
+            let end = min(max(range.upperBound / maximum, 0), 1) * width
+            let current = min(max(visualization.current / maximum, 0), 1) * width
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.16))
+                    .frame(height: 6)
+
+                Capsule()
+                    .fill(tint)
+                    .frame(width: max(end - start, 3), height: 6)
+                    .offset(x: start)
+
+                Circle()
+                    .fill(Color.primary)
+                    .frame(width: 10, height: 10)
+                    .offset(x: min(max(current - 5, 0), max(width - 10, 0)))
+            }
+            .frame(height: 10)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.22),
+                value: visualization.current
+            )
+        }
+        .frame(height: 10)
+        .accessibilityHidden(true)
     }
 }

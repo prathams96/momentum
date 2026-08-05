@@ -8,6 +8,7 @@ import UserNotifications
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var settingsRecords: [AppSettingsRecord]
     @Query private var routineRecords: [CareRoutineTemplateRecord]
 
@@ -24,7 +25,8 @@ struct SettingsView: View {
         Form {
             statusSection
             generalSection
-            remindersSection
+            dailyRemindersSection
+            careRemindersSection
             exportSection
             aboutSection
             resetSection
@@ -34,15 +36,30 @@ struct SettingsView: View {
         .tint(MomentumTheme.pulse)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
+                Button {
                     requestSaveSettings()
+                } label: {
+                    ZStack {
+                        Text("Save")
+                            .opacity(isSaving ? 0 : 1)
+                        if isSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+                    .frame(minWidth: 36)
                 }
                 .disabled(settings == nil || savedDraft == draft || isSaving)
+                .accessibilityLabel(isSaving ? "Saving settings" : "Save settings")
             }
         }
         .task {
             loadDraftIfNeeded()
             await refreshNotificationStatus()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await refreshNotificationStatus() }
         }
         .alert(item: $presentedAlert) { alert in
             switch alert {
@@ -84,33 +101,47 @@ struct SettingsView: View {
 
     private var statusSection: some View {
         Section {
-            LabeledContent {
-                Label(notificationStatus.title, systemImage: notificationStatus.symbol)
-                    .foregroundStyle(notificationStatus.isProblem ? .orange : .secondary)
-            } label: {
-                Text("Notifications")
-            }
+            SettingsStatusRow(
+                title: "Notifications",
+                symbol: "bell.fill",
+                value: notificationStatus.title,
+                valueSymbol: notificationStatus.valueSymbol,
+                tint: notificationStatus.tint
+            )
 
             if notificationStatus == .denied {
-                Button("Open system settings") {
+                Button {
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     openURL(url)
+                } label: {
+                    Label("Open system settings", systemImage: "arrow.up.right")
                 }
             }
 
-            LabeledContent("iCloud", value: iCloudStatusTitle)
-            if let detail = iCloudStatusDetail {
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+            SettingsStatusRow(
+                title: "iCloud",
+                symbol: "icloud.fill",
+                value: iCloudStatusTitle,
+                valueSymbol: iCloudStatusSymbol,
+                tint: iCloudStatusTint,
+                detail: iCloudStatusDetail
+            )
 
             if let schedulingStatusTitle {
-                LabeledContent("Reminder scheduling", value: schedulingStatusTitle)
-                    .foregroundStyle(settings?.notificationSchedulingStatusRaw == "failed" ? .orange : .secondary)
+                SettingsStatusRow(
+                    title: "Reminder scheduling",
+                    symbol: "clock.badge.checkmark.fill",
+                    value: schedulingStatusTitle,
+                    valueSymbol: settings?.notificationSchedulingStatusRaw == "failed"
+                        ? "exclamationmark.triangle.fill"
+                        : "checkmark.circle.fill",
+                    tint: settings?.notificationSchedulingStatusRaw == "failed"
+                        ? MomentumTheme.warning
+                        : MomentumTheme.success
+                )
             }
         } header: {
-            Text("Status")
+            Text("System status")
         } footer: {
             Text("Momentum works locally when iCloud or notifications are unavailable.")
         }
@@ -118,16 +149,20 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         Section {
-            Picker("Units", selection: $draft.unitSystemRaw) {
+            Picker(selection: $draft.unitSystemRaw) {
                 ForEach(UnitSystemOption.allCases) { option in
                     Text(option.title).tag(option.rawValue)
                 }
+            } label: {
+                Label("Units", systemImage: "scalemass")
             }
 
-            Picker("Appearance", selection: $draft.selectedAppearanceRaw) {
+            Picker(selection: $draft.selectedAppearanceRaw) {
                 ForEach(AppearanceOption.allCases) { option in
                     Text(option.title).tag(option.rawValue)
                 }
+            } label: {
+                Label("Appearance", systemImage: "circle.lefthalf.filled")
             }
 
             Stepper(
@@ -135,7 +170,12 @@ struct SettingsView: View {
                 in: 0...(12 * 60),
                 step: 30
             ) {
-                LabeledContent("Domain Day cutoff", value: formattedTime(draft.domainDayCutoffMinutes))
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Domain Day cutoff", systemImage: "moon.stars.fill")
+                    Text(formattedTime(draft.domainDayCutoffMinutes))
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
         } header: {
             Text("General")
@@ -144,18 +184,25 @@ struct SettingsView: View {
         }
     }
 
-    private var remindersSection: some View {
+    private var dailyRemindersSection: some View {
         Section {
             SettingsTimePicker(label: "Due workout", minutes: $draft.workoutNotificationMinutes)
             SettingsTimePicker(label: "Unfinished nutrition", minutes: $draft.nutritionReminderMinutes)
-
-            ForEach($draft.routineReminders) { $reminder in
-                SettingsTimePicker(label: reminder.name, minutes: $reminder.minutes)
-            }
         } header: {
-            Text("Reminder times")
+            Text("Daily reminders")
         } footer: {
             Text("Times are local to your current time zone. Notification permission is managed by iOS.")
+        }
+    }
+
+    @ViewBuilder
+    private var careRemindersSection: some View {
+        if !draft.routineReminders.isEmpty {
+            Section("Care reminders") {
+                ForEach($draft.routineReminders) { $reminder in
+                    SettingsTimePicker(label: reminder.name, minutes: $reminder.minutes)
+                }
+            }
         }
     }
 
@@ -190,10 +237,17 @@ struct SettingsView: View {
     }
 
     private var aboutSection: some View {
-        Section("About and data") {
+        Section("About and privacy") {
             LabeledContent("App", value: "Momentum")
-            Text("Momentum stores workout, nutrition, care, and measurement data on this device and in your private iCloud database when available.")
-            Text("There are no accounts, ads, analytics, or third-party data services.")
+            VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
+                Label("Data storage", systemImage: "hand.raised.fill")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text("Momentum stores workout, nutrition, care, and measurement data on this device and in your private iCloud database when available.")
+                Text("There are no accounts, ads, analytics, or third-party data services.")
+            }
+            .foregroundStyle(.secondary)
+            .padding(.vertical, MomentumSpacing.xxs)
         }
     }
 
@@ -245,6 +299,23 @@ struct SettingsView: View {
             return "Last confirmed sync \(lastSuccessfulSyncAt.formatted(date: .abbreviated, time: .shortened))."
         }
         return nil
+    }
+
+    private var iCloudStatusSymbol: String {
+        switch settings?.iCloudStatusRaw {
+        case "synced": "checkmark.circle.fill"
+        case "unavailable", "noAccount", "restricted": "exclamationmark.triangle.fill"
+        case "syncing", "available": "arrow.triangle.2.circlepath"
+        default: "iphone"
+        }
+    }
+
+    private var iCloudStatusTint: Color {
+        switch settings?.iCloudStatusRaw {
+        case "synced": MomentumTheme.success
+        case "unavailable", "noAccount", "restricted": MomentumTheme.warning
+        default: .secondary
+        }
     }
 
     private func loadDraftIfNeeded() {
@@ -324,6 +395,63 @@ struct SettingsView: View {
             from: DateComponents(hour: minutes / 60, minute: minutes % 60)
         ) ?? .now
         return date.formatted(date: .omitted, time: .shortened)
+    }
+}
+
+private struct SettingsStatusRow: View {
+    let title: String
+    let symbol: String
+    let value: String
+    let valueSymbol: String
+    let tint: Color
+    var detail: String?
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        HStack(alignment: .top, spacing: MomentumSpacing.sm) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(MomentumTheme.pulse)
+                .frame(width: 30, height: 30)
+                .background(MomentumTheme.pulseWash)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: MomentumSpacing.xxs) {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: MomentumSpacing.xxs) {
+                        Text(title)
+                            .font(.body.weight(.medium))
+                        statusLabel
+                    }
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: MomentumSpacing.sm) {
+                        Text(title)
+                            .font(.body.weight(.medium))
+                        Spacer(minLength: 0)
+                        statusLabel
+                    }
+                }
+
+                if let detail {
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.vertical, MomentumSpacing.xxs)
+        .listRowSeparator(.hidden)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var statusLabel: some View {
+        Label(value, systemImage: valueSymbol)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(tint)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -459,16 +587,21 @@ private enum SettingsNotificationStatus: Equatable {
         }
     }
 
-    var symbol: String {
+    var valueSymbol: String {
         switch self {
-        case .checking: "bell"
-        case .notDetermined: "bell.badge"
-        case .allowed: "bell.fill"
-        case .denied, .unavailable: "bell.slash"
+        case .checking: "ellipsis.circle"
+        case .notDetermined: "questionmark.circle"
+        case .allowed: "checkmark.circle.fill"
+        case .denied, .unavailable: "exclamationmark.triangle.fill"
         }
     }
 
-    var isProblem: Bool {
-        self == .denied || self == .unavailable
+    var tint: Color {
+        switch self {
+        case .allowed: MomentumTheme.success
+        case .denied, .unavailable: MomentumTheme.warning
+        case .checking, .notDetermined: .secondary
+        }
     }
+
 }
