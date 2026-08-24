@@ -90,7 +90,8 @@ final class ModuleRegistryTests: XCTestCase {
 
         // Today, plan, insights, and history-aggregation capabilities ship
         // with the built-in adapters; Phase D moved reconciliation behind
-        // the workout and care module boundaries.
+        // the workout and care module boundaries. Phase E moved reminder
+        // candidates and export definitions behind every module boundary.
         XCTAssertEqual(Set(registry.todayContributors.map { $0.metadata.id }), builtInIDs)
         XCTAssertEqual(Set(registry.planContributors.map { $0.metadata.id }), builtInIDs)
         XCTAssertEqual(
@@ -101,7 +102,7 @@ final class ModuleRegistryTests: XCTestCase {
             Set(registry.reconcilers.map { $0.metadata.id }),
             [BuiltInModuleID.workout, BuiltInModuleID.care]
         )
-        XCTAssertTrue(registry.reminderProviders.isEmpty)
-        XCTAssertTrue(registry.exportProviders.isEmpty)
+        XCTAssertEqual(Set(registry.reminderProviders.map { $0.metadata.id }), builtInIDs)
+        XCTAssertEqual(Set(registry.exportProviders.map { $0.metadata.id }), builtInIDs)
     }
 }

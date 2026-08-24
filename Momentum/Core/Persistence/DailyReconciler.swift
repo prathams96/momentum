@@ -74,29 +74,9 @@ enum DailyReconciler {
         let settings = AppSettingsRecord.canonical(
             in: try context.fetch(FetchDescriptor<AppSettingsRecord>())
         )
-        let occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
-        let nutritionDays = try context.fetch(FetchDescriptor<NutritionDayRecord>())
-        let workouts = try context.fetch(FetchDescriptor<WorkoutTemplateRecord>())
-        let anchors = try context.fetch(FetchDescriptor<CycleAnchorRecord>())
-        let sessions = try context.fetch(FetchDescriptor<WorkoutSessionRecord>())
-        let state = ScheduleProjection.evaluate(
-            workouts: workouts,
-            anchors: anchors,
-            sessions: sessions,
-            settings: settings.map { [$0] } ?? [],
-            now: now,
-            calendar: calendar
-        )
-        let currentDay = DomainDay.containing(
-            now,
-            calendar: calendar,
-            cutoffMinutes: settings?.domainDayCutoffMinutes ?? 180
-        )
-        let reminders = ReminderDeriver.reminders(
-            scheduleState: state,
+        let reminders = deriveReminders(
             settings: settings,
-            occurrences: occurrences,
-            nutritionDay: nutritionDays.first { $0.domainDay == PersistedDomainDay.encode(currentDay) },
+            in: context,
             now: now,
             calendar: calendar
         )
@@ -109,6 +89,33 @@ enum DailyReconciler {
             try? context.save()
             throw error
         }
+    }
+
+    /// Collects reminder candidates from enabled modules' ReminderCandidateProviding
+    /// in registry rank order, then runs them through the generic Core bundler.
+    /// Internal so tests can exercise the full pipeline synchronously.
+    static func deriveReminders(
+        settings: AppSettingsRecord?,
+        in context: ModelContext,
+        now: Date,
+        calendar: Calendar,
+        registry: ModuleRegistry = .standard
+    ) -> [ScheduledReminder] {
+        let moduleContext = ModuleContext.make(
+            in: context,
+            settings: settings,
+            now: now,
+            calendar: calendar
+        )
+        let enabled = ModuleEnablementStore.enabledIDs(from: settings)
+        let providers = registry
+            .enabledModules(enabled)
+            .compactMap { $0 as? any ReminderCandidateProviding }
+        let candidates = providers.flatMap { $0.reminderCandidates(in: moduleContext) }
+        return ReminderBundler.bundle(
+            candidates,
+            anchorCategory: MomentumNotificationCategory.eveningCheckIn
+        )
     }
 
     /// Completes a Care Routine through the same mutation boundary used by notification actions.

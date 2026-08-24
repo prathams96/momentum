@@ -12,6 +12,8 @@ struct ModuleContext {
     let now: Date
     let domainDayCutoffMinutes: Int
     let unitSystemRaw: String
+    let workoutNotificationMinutes: Int
+    let nutritionReminderMinutes: Int
     let currentDomainDay: DomainDay
     let previousDomainDay: DomainDay
 
@@ -20,13 +22,17 @@ struct ModuleContext {
         calendar: Calendar = .autoupdatingCurrent,
         now: Date = .now,
         domainDayCutoffMinutes: Int = 180,
-        unitSystemRaw: String = "metric"
+        unitSystemRaw: String = "metric",
+        workoutNotificationMinutes: Int = 18 * 60 + 30,
+        nutritionReminderMinutes: Int = 22 * 60
     ) {
         self.modelContext = modelContext
         self.calendar = calendar
         self.now = now
         self.domainDayCutoffMinutes = domainDayCutoffMinutes
         self.unitSystemRaw = unitSystemRaw
+        self.workoutNotificationMinutes = workoutNotificationMinutes
+        self.nutritionReminderMinutes = nutritionReminderMinutes
         self.currentDomainDay = DomainDay.containing(
             now,
             calendar: calendar,
@@ -50,7 +56,9 @@ struct ModuleContext {
             calendar: calendar,
             now: now,
             domainDayCutoffMinutes: settings?.domainDayCutoffMinutes ?? 180,
-            unitSystemRaw: settings?.unitSystemRaw ?? "metric"
+            unitSystemRaw: settings?.unitSystemRaw ?? "metric",
+            workoutNotificationMinutes: settings?.workoutNotificationMinutes ?? 18 * 60 + 30,
+            nutritionReminderMinutes: settings?.nutritionReminderMinutes ?? 22 * 60
         )
     }
 }

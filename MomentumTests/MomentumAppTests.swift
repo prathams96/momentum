@@ -423,66 +423,80 @@ final class MomentumAppTests: XCTestCase {
         XCTAssertEqual(events.map(\.kindRaw), ["skipped"])
     }
 
-    func testReminderDeriverUsesStableWorkoutAndEveningIdentifiers() throws {
-        let settings = AppSettingsRecord(
+    func testReminderPipelineUsesStableNamespacedIdentifiers() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let day = DomainDay(year: 2026, month: 8, day: 2)
+        context.insert(AppSettingsRecord(
             domainDayCutoffMinutes: 180,
             workoutNotificationMinutes: 18 * 60,
             nutritionReminderMinutes: 22 * 60
-        )
-        let now = PersistedDomainDay.date(
-            for: DomainDay(year: 2026, month: 8, day: 2),
-            calendar: .autoupdatingCurrent,
-            hour: 12
-        )!
+        ))
         let workoutID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
-        let reminders = ReminderDeriver.reminders(
-            scheduleState: .due(
-                workoutID: workoutID,
-                dueDay: DomainDay(year: 2026, month: 8, day: 2),
-                overdueBy: 0
-            ),
-            settings: settings,
-            occurrences: [],
-            nutritionDay: NutritionDayRecord(domainDay: "2026-08-02"),
+        context.insert(WorkoutTemplateRecord(
+            id: workoutID,
+            name: "Upper A",
+            sequenceIndex: 0,
+            recoveryDaysAfter: 1
+        ))
+        context.insert(CycleAnchorRecord(
+            nextWorkoutTemplateID: workoutID,
+            firstDueDomainDay: PersistedDomainDay.encode(day)
+        ))
+        context.insert(NutritionDayRecord(domainDay: PersistedDomainDay.encode(day)))
+        try context.save()
+
+        let now = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 12)!
+        let reminders = DailyReconciler.deriveReminders(
+            settings: AppSettingsRecord.canonical(in: try context.fetch(FetchDescriptor<AppSettingsRecord>())),
+            in: context,
             now: now,
             calendar: .autoupdatingCurrent
         )
 
         XCTAssertEqual(
             reminders.map(\.identifier),
-            ["workout.\(workoutID.uuidString).2026-08-02", "evening.2026-08-02"]
+            ["workout.due.\(workoutID.uuidString).2026-08-02", "nutrition.checkin.2026-08-02"]
         )
     }
 
     func testOverdueWorkoutReminderRepresentsCurrentOpportunity() throws {
-        let settings = AppSettingsRecord(
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let currentDay = DomainDay(year: 2026, month: 8, day: 4)
+        context.insert(AppSettingsRecord(
             domainDayCutoffMinutes: 180,
             workoutNotificationMinutes: 18 * 60
-        )
-        let currentDay = DomainDay(year: 2026, month: 8, day: 4)
-        let now = PersistedDomainDay.date(
-            for: currentDay,
-            calendar: .autoupdatingCurrent,
-            hour: 12
-        )!
+        ))
         let workoutID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
+        context.insert(WorkoutTemplateRecord(
+            id: workoutID,
+            name: "Upper A",
+            sequenceIndex: 0,
+            recoveryDaysAfter: 1
+        ))
+        context.insert(CycleAnchorRecord(
+            nextWorkoutTemplateID: workoutID,
+            firstDueDomainDay: "2026-08-02"
+        ))
+        context.insert(NutritionDayRecord(
+            domainDay: "2026-08-04",
+            finalizedAt: PersistedDomainDay.date(for: currentDay, calendar: .autoupdatingCurrent, hour: 11)
+        ))
+        try context.save()
 
-        let reminders = ReminderDeriver.reminders(
-            scheduleState: .due(
-                workoutID: workoutID,
-                dueDay: DomainDay(year: 2026, month: 8, day: 2),
-                overdueBy: 2
-            ),
-            settings: settings,
-            occurrences: [],
-            nutritionDay: NutritionDayRecord(domainDay: "2026-08-04", finalizedAt: now),
+        let now = PersistedDomainDay.date(for: currentDay, calendar: .autoupdatingCurrent, hour: 12)!
+        let reminders = DailyReconciler.deriveReminders(
+            settings: AppSettingsRecord.canonical(in: try context.fetch(FetchDescriptor<AppSettingsRecord>())),
+            in: context,
             now: now,
             calendar: .autoupdatingCurrent
         )
 
         let workout = try XCTUnwrap(reminders.first { $0.categoryIdentifier == MomentumNotificationCategory.workoutDue })
-        XCTAssertEqual(workout.identifier, "workout.\(workoutID.uuidString).2026-08-04")
+        XCTAssertEqual(workout.identifier, "workout.due.\(workoutID.uuidString).2026-08-04")
         XCTAssertEqual(workout.userInfo["domainDay"], "2026-08-04")
+        XCTAssertFalse(reminders.contains { $0.categoryIdentifier == MomentumNotificationCategory.eveningCheckIn })
     }
 
     func testWorkoutNotificationRouteCarriesTargetAndCurrentOpportunityDay() throws {
@@ -496,26 +510,27 @@ final class MomentumAppTests: XCTestCase {
         XCTAssertEqual(route.domainDay, DomainDay(year: 2026, month: 8, day: 4))
     }
 
-    func testNightCareAndOpenNutritionAtSameTimeCoalesceIntoOneEveningReminder() throws {
-        let settings = AppSettingsRecord(
+    func testNightCareAtEveningTimeFoldsIntoOneEveningReminder() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let day = DomainDay(year: 2026, month: 8, day: 2)
+        context.insert(AppSettingsRecord(
             domainDayCutoffMinutes: 180,
             nutritionReminderMinutes: 22 * 60
-        )
-        let day = DomainDay(year: 2026, month: 8, day: 2)
-        let now = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 12)!
-        let dueAt = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 22)!
+        ))
         let occurrence = CareOccurrenceRecord(
-            routineNameSnapshot: "Editable night routine",
+            routineNameSnapshot: "Night skincare",
             routineRoleRaw: "night",
             dueDomainDay: "2026-08-02",
-            dueAt: dueAt
+            dueAt: PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 22)!
         )
+        context.insert(occurrence)
+        try context.save()
 
-        let reminders = ReminderDeriver.reminders(
-            scheduleState: .needsRepair(reason: .missingAnchorWorkout),
-            settings: settings,
-            occurrences: [occurrence],
-            nutritionDay: nil,
+        let now = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 12)!
+        let reminders = DailyReconciler.deriveReminders(
+            settings: AppSettingsRecord.canonical(in: try context.fetch(FetchDescriptor<AppSettingsRecord>())),
+            in: context,
             now: now,
             calendar: .autoupdatingCurrent
         )
@@ -523,6 +538,10 @@ final class MomentumAppTests: XCTestCase {
         XCTAssertEqual(reminders.count, 1)
         XCTAssertEqual(reminders.first?.categoryIdentifier, MomentumNotificationCategory.eveningCheckIn)
         XCTAssertEqual(reminders.first?.userInfo["occurrenceID"], occurrence.id.uuidString)
+        XCTAssertEqual(
+            reminders.first?.body,
+            "Finish logging today’s food and check your Night skincare routine."
+        )
     }
 
     func testCompletingAlternatingCareFromNotificationAdvancesRecurrence() throws {
