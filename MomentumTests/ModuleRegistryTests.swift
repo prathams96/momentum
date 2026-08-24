@@ -81,16 +81,26 @@ final class ModuleRegistryTests: XCTestCase {
     }
 
     func testCapabilityDiscoveryOnlySeesImplementingModules() {
-        let registry = ModuleRegistry(modules: [
-            WorkoutModuleAdapter(),
-            FakeTestModule(),
-        ])
+        let registry = ModuleRegistry.standard
+        let builtInIDs: Set<ModuleID> = [
+            BuiltInModuleID.workout,
+            BuiltInModuleID.nutrition,
+            BuiltInModuleID.care,
+        ]
 
-        XCTAssertTrue(registry.todayContributors.isEmpty, "Adapters gain capabilities in later phases.")
-        XCTAssertTrue(registry.planContributors.isEmpty)
-        XCTAssertTrue(registry.insightsContributors.isEmpty)
-        XCTAssertTrue(registry.historyContributors.isEmpty)
-        XCTAssertTrue(registry.reconcilers.isEmpty)
+        // Today, plan, insights, and history-aggregation capabilities ship
+        // with the built-in adapters; Phase D moved reconciliation behind
+        // the workout and care module boundaries.
+        XCTAssertEqual(Set(registry.todayContributors.map { $0.metadata.id }), builtInIDs)
+        XCTAssertEqual(Set(registry.planContributors.map { $0.metadata.id }), builtInIDs)
+        XCTAssertEqual(
+            Set(registry.insightsContributors.map { $0.metadata.id }),
+            [BuiltInModuleID.workout, BuiltInModuleID.nutrition]
+        )
+        XCTAssertEqual(
+            Set(registry.reconcilers.map { $0.metadata.id }),
+            [BuiltInModuleID.workout, BuiltInModuleID.care]
+        )
         XCTAssertTrue(registry.reminderProviders.isEmpty)
         XCTAssertTrue(registry.exportProviders.isEmpty)
     }

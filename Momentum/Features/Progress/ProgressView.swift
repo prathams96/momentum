@@ -40,17 +40,6 @@ struct ProgressTabView: View {
     private var pendingMilestone: MilestoneRecord? {
         MilestoneService.nextUnacknowledged(in: milestones)
     }
-    private var milestoneSourceVersion: String {
-        [
-            "sessions:\(sessions.count):\(sessions.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
-            "logs:\(exerciseLogs.count):\(exerciseLogs.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
-            "sets:\(setLogs.count):\(setLogs.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
-            "events:\(workoutEvents.count):\(workoutEvents.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
-            "nutrition:\(nutritionDays.count):\(nutritionDays.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
-            "food:\(foodEntries.count):\(foodEntries.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)",
-            "care:\(careOccurrences.count):\(careOccurrences.map(\.updatedAt).max()?.timeIntervalSince1970 ?? 0)"
-        ].joined(separator: "|")
-    }
 
     var body: some View {
         List {
@@ -61,10 +50,6 @@ struct ProgressTabView: View {
             adherenceSection
         }
         .navigationTitle("Progress")
-        .task(id: milestoneSourceVersion) {
-            do { try MilestoneService.reconcile(in: modelContext) }
-            catch { actionError = "Milestones could not be refreshed. Your activity is still safe." }
-        }
         .alert("Couldn’t update progress", isPresented: Binding(
             get: { actionError != nil }, set: { if !$0 { actionError = nil } }
         )) { Button("OK", role: .cancel) {} } message: { Text(actionError ?? "Try again.") }
