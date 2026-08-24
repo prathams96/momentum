@@ -21,6 +21,7 @@ final class AppSettingsRecord {
     var iCloudStatusUpdatedAt: Date?
     var lastSuccessfulSyncAt: Date?
     var seedVersion: Int = 0
+    var enabledModulesRaw: String = "workout,nutrition,care"
     var calorieTarget: Int = 2400
     var calorieMinimum: Int = 2300
     var calorieMaximum: Int = 2500
@@ -45,6 +46,7 @@ final class AppSettingsRecord {
         iCloudStatusUpdatedAt: Date? = nil,
         lastSuccessfulSyncAt: Date? = nil,
         seedVersion: Int = 0,
+        enabledModulesRaw: String = "workout,nutrition,care",
         calorieTarget: Int = 2400,
         calorieMinimum: Int = 2300,
         calorieMaximum: Int = 2500,
@@ -68,6 +70,7 @@ final class AppSettingsRecord {
         self.iCloudStatusUpdatedAt = iCloudStatusUpdatedAt
         self.lastSuccessfulSyncAt = lastSuccessfulSyncAt
         self.seedVersion = seedVersion
+        self.enabledModulesRaw = enabledModulesRaw
         self.calorieTarget = calorieTarget
         self.calorieMinimum = calorieMinimum
         self.calorieMaximum = calorieMaximum

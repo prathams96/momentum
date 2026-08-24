@@ -1,0 +1,29 @@
+import Foundation
+
+/// Persists module activation on the settings record as a comma-separated
+/// list of ModuleID raw values. Disable ≠ delete: modules keep their data.
+@MainActor
+enum ModuleEnablementStore {
+    static let defaultRawValue = "workout,nutrition,care"
+
+    static var defaultEnabledIDs: Set<ModuleID> {
+        ModuleRegistry.defaultEnabledIDs
+    }
+
+    static func enabledIDs(from settings: AppSettingsRecord?) -> Set<ModuleID> {
+        guard let settings else { return ModuleRegistry.defaultEnabledIDs }
+        let ids = settings.enabledModulesRaw
+            .split(separator: ",")
+            .map { ModuleID($0.trimmingCharacters(in: .whitespaces)) }
+            .filter { !$0.rawValue.isEmpty }
+        return ids.isEmpty ? ModuleRegistry.defaultEnabledIDs : Set(ids)
+    }
+
+    static func apply(_ ids: Set<ModuleID>, to settings: AppSettingsRecord) {
+        settings.enabledModulesRaw = ids
+            .map(\.rawValue)
+            .sorted()
+            .joined(separator: ",")
+        settings.updatedAt = .now
+    }
+}
