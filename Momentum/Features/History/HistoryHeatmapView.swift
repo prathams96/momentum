@@ -243,7 +243,6 @@ struct HistoryDayRow: View {
     let nutritionDays: [NutritionDayRecord]
     let foodEntries: [FoodEntryRecord]
     let careOccurrences: [CareOccurrenceRecord]
-    let measurements: [BodyMeasurementRecord]
 
     private var dayKey: String { PersistedDomainDay.encode(day) }
 
@@ -272,10 +271,6 @@ struct HistoryDayRow: View {
         if category == .all || category == .care {
             let care = careOccurrences.count { $0.dueDomainDay == dayKey }
             if care > 0 { values.append("\(care) care \(care == 1 ? "routine" : "routines")") }
-        }
-        if category == .all || category == .measurements {
-            let count = measurements.count { $0.deletedAt == nil && $0.domainDay == dayKey }
-            if count > 0 { values.append("\(count) \(count == 1 ? "measurement" : "measurements")") }
         }
         return values
     }
