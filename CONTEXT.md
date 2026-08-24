@@ -1,11 +1,11 @@
 # Personal Routine Tracker
 
-A personal system for planning and recording one person's fitness, nutrition, skincare, and hair-care routines.
+A consumer app for planning and recording one person's fitness, nutrition, skincare, and hair-care routines. There are no accounts; each installation serves exactly one person.
 
 ## Language
 
 **Routine Owner**:
-The sole person whose highly customized routines, reminders, and daily records are managed by the app.
+The person whose routines, reminders, and daily records an installation manages. Every installation has exactly one Routine Owner.
 _Avoid_: User, account, member
 
 ## Fitness
@@ -86,6 +86,14 @@ _Avoid_: Brand, product name
 A calendar day's completion percentage across activities due that day. Recovery Days add no workout obligation.
 _Avoid_: Active day
 
+**Hydration Target**:
+The daily fluid-intake goal, evaluated against entries logged for a Domain Day.
+_Avoid_: Water goal
+
+**Hydration Entry**:
+A single recorded fluid amount attributed to a Domain Day, logged via preset or custom amount.
+_Avoid_: Drink log
+
 **Category Streak**:
-Consecutive eligible days on which the due activities in one category—workout, nutrition logging, or personal care—were completed.
+Consecutive eligible days on which the due activities in one category—workout, nutrition logging, personal care, or hydration—were completed. Days on which the category's module is disabled are ineligible: the streak pauses and resumes counting on re-enable rather than breaking.
 _Avoid_: Global streak
