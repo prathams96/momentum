@@ -4,7 +4,7 @@ import Foundation
 /// list of ModuleID raw values. Disable ≠ delete: modules keep their data.
 @MainActor
 enum ModuleEnablementStore {
-    static let defaultRawValue = "workout,nutrition,care"
+    static let defaultRawValue = "workout,nutrition,care,hydration"
 
     static var defaultEnabledIDs: Set<ModuleID> {
         ModuleRegistry.defaultEnabledIDs

@@ -16,6 +16,7 @@ struct ModuleRegistry {
         WorkoutModuleAdapter(),
         NutritionModuleAdapter(),
         CareModuleAdapter(),
+        HydrationModuleAdapter(),
     ])
 
     /// Enablement applied before any enablement preference exists on disk.
@@ -23,6 +24,7 @@ struct ModuleRegistry {
         BuiltInModuleID.workout,
         BuiltInModuleID.nutrition,
         BuiltInModuleID.care,
+        BuiltInModuleID.hydration,
     ]
 
     func module(with id: ModuleID) -> (any MomentumModule)? {

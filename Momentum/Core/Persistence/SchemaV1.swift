@@ -21,7 +21,7 @@ final class AppSettingsRecord {
     var iCloudStatusUpdatedAt: Date?
     var lastSuccessfulSyncAt: Date?
     var seedVersion: Int = 0
-    var enabledModulesRaw: String = "workout,nutrition,care"
+    var enabledModulesRaw: String = "workout,nutrition,care,hydration"
     var calorieTarget: Int = 2400
     var calorieMinimum: Int = 2300
     var calorieMaximum: Int = 2500
@@ -46,7 +46,7 @@ final class AppSettingsRecord {
         iCloudStatusUpdatedAt: Date? = nil,
         lastSuccessfulSyncAt: Date? = nil,
         seedVersion: Int = 0,
-        enabledModulesRaw: String = "workout,nutrition,care",
+        enabledModulesRaw: String = "workout,nutrition,care,hydration",
         calorieTarget: Int = 2400,
         calorieMinimum: Int = 2300,
         calorieMaximum: Int = 2500,
@@ -838,5 +838,134 @@ final class MilestoneRecord {
         self.acknowledgedAt = acknowledgedAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+}
+
+@Model
+final class HydrationPlanRecord {
+    var id: UUID = UUID()
+    var targetML: Int = 2500
+    var firstPresetML: Int = 250
+    var secondPresetML: Int = 500
+    var thirdPresetML: Int = 750
+    var remindersEnabled: Bool = false
+    var firstCheckpointMinutes: Int = 11 * 60
+    var secondCheckpointMinutes: Int = 15 * 60
+    var thirdCheckpointMinutes: Int = 19 * 60
+    var createdAt: Date = Foundation.Date()
+    var updatedAt: Date = Foundation.Date()
+
+    init(
+        id: UUID = UUID(),
+        targetML: Int = 2500,
+        firstPresetML: Int = 250,
+        secondPresetML: Int = 500,
+        thirdPresetML: Int = 750,
+        remindersEnabled: Bool = false,
+        firstCheckpointMinutes: Int = 11 * 60,
+        secondCheckpointMinutes: Int = 15 * 60,
+        thirdCheckpointMinutes: Int = 19 * 60,
+        createdAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.id = id
+        self.targetML = targetML
+        self.firstPresetML = firstPresetML
+        self.secondPresetML = secondPresetML
+        self.thirdPresetML = thirdPresetML
+        self.remindersEnabled = remindersEnabled
+        self.firstCheckpointMinutes = firstCheckpointMinutes
+        self.secondCheckpointMinutes = secondCheckpointMinutes
+        self.thirdCheckpointMinutes = thirdCheckpointMinutes
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+@Model
+final class HydrationEntryRecord {
+    var id: UUID = UUID()
+    var amountML: Int = 0
+    var consumedAt: Date = Foundation.Date()
+    var domainDay: String = ""
+    var createdAt: Date = Foundation.Date()
+    var updatedAt: Date = Foundation.Date()
+    var deletedAt: Date?
+
+    init(
+        id: UUID = UUID(),
+        amountML: Int,
+        consumedAt: Date = .now,
+        domainDay: String,
+        createdAt: Date = .now,
+        updatedAt: Date = .now,
+        deletedAt: Date? = nil
+    ) {
+        self.id = id
+        self.amountML = amountML
+        self.consumedAt = consumedAt
+        self.domainDay = domainDay
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.deletedAt = deletedAt
+    }
+}
+
+@Model
+final class HydrationDayRecord {
+    var id: UUID = UUID()
+    var domainDay: String = ""
+    var targetMLSnapshot: Int = 2500
+    /// First-entry freeze marker: while nil, the snapshot keeps tracking plan edits.
+    var firstEntryAt: Date?
+    /// Checkpoint slots (minute-of-day) that already fired today; caps reminders.
+    var firedCheckpointSlotsRaw: String = ""
+    var createdAt: Date = Foundation.Date()
+    var updatedAt: Date = Foundation.Date()
+
+    init(
+        id: UUID = UUID(),
+        domainDay: String,
+        targetMLSnapshot: Int = 2500,
+        firstEntryAt: Date? = nil,
+        firedCheckpointSlotsRaw: String = "",
+        createdAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.id = id
+        self.domainDay = domainDay
+        self.targetMLSnapshot = targetMLSnapshot
+        self.firstEntryAt = firstEntryAt
+        self.firedCheckpointSlotsRaw = firedCheckpointSlotsRaw
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+/// Lightweight generic cross-module fact substrate (ADR-0002). Nothing
+/// consumes these yet; modules emit them for future projections.
+@Model
+final class ModuleFactRecord {
+    var id: UUID = UUID()
+    var moduleIDRaw: String = ""
+    var kindRaw: String = ""
+    var domainDay: String = ""
+    var subjectID: UUID?
+    var createdAt: Date = Foundation.Date()
+
+    init(
+        id: UUID = UUID(),
+        moduleIDRaw: String,
+        kindRaw: String,
+        domainDay: String,
+        subjectID: UUID? = nil,
+        createdAt: Date = .now
+    ) {
+        self.id = id
+        self.moduleIDRaw = moduleIDRaw
+        self.kindRaw = kindRaw
+        self.domainDay = domainDay
+        self.subjectID = subjectID
+        self.createdAt = createdAt
     }
 }

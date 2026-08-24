@@ -53,18 +53,13 @@ struct HistoryView: View {
 
     private var filteredDays: [DomainDay] {
         var days = Set<DomainDay>()
-        if category.includes(.workouts) {
-            days.formUnion(adherenceFacts.filter { $0.category == .workouts }.map(\.day))
-        }
+        // Modules report the days behind their own adherence facts.
+        days.formUnion(adherenceFacts.filter { category.includes($0.category) }.map(\.day))
         if category.includes(.nutrition) {
-            days.formUnion(adherenceFacts.filter { $0.category == .nutrition }.map(\.day))
             // Facts only map finalized-day records; food-entry-only days stay visible.
             days.formUnion(foodEntries.compactMap {
                 $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
             })
-        }
-        if category.includes(.care) {
-            days.formUnion(adherenceFacts.filter { $0.category == .care }.map(\.day))
         }
         return days.sorted(by: >)
     }

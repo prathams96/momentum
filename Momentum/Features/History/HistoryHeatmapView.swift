@@ -213,6 +213,10 @@ struct HistoryStreakSummaryView: View {
                 Label("Measurements are facts, not adherence obligations.", systemImage: "info.circle")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            default:
+                // Categories beyond the legacy summary fields render their
+                // streaks through their own module contributions instead.
+                EmptyView()
             }
         }
     }

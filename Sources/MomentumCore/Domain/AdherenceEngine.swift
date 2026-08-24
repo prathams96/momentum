@@ -7,6 +7,7 @@ public enum AdherenceActivityKind: Equatable, Sendable {
     case nightCare
     case hairCare
     case postWorkoutCare
+    case hydration
 }
 
 public struct DueAdherenceActivity: Equatable, Sendable {
@@ -49,6 +50,18 @@ public struct CareAdherenceDay: Equatable, Sendable {
         self.day = day
         self.dueCount = dueCount
         self.completedCount = completedCount
+    }
+}
+
+public struct HydrationAdherenceDay: Equatable, Sendable {
+    public let day: DomainDay
+    public let isTargetReached: Bool
+    public let isPaused: Bool
+
+    public init(day: DomainDay, isTargetReached: Bool, isPaused: Bool = false) {
+        self.day = day
+        self.isTargetReached = isTargetReached
+        self.isPaused = isPaused
     }
 }
 
@@ -107,6 +120,23 @@ public struct AdherenceEngine: Sendable {
                     return .neutral
                 }
                 return day.completedCount >= day.dueCount ? .completed : .incomplete
+            }
+        )
+    }
+
+    /// Consecutive eligible days with the hydration target reached. Paused
+    /// (module-disabled) days neither extend nor reset the streak.
+    public func hydrationStreak(
+        days: [HydrationAdherenceDay],
+        calendar: Calendar
+    ) -> Int {
+        streak(
+            days: days.sorted { $0.day < $1.day },
+            calendar: calendar,
+            domainDay: \.day,
+            outcome: { day in
+                if day.isPaused { return .neutral }
+                return day.isTargetReached ? .completed : .incomplete
             }
         )
     }

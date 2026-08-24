@@ -23,7 +23,7 @@ final class ModuleRegistryTests: XCTestCase {
 
         XCTAssertEqual(
             registry.modules.map { $0.metadata.id.rawValue },
-            ["workout", "nutrition", "care"]
+            ["workout", "nutrition", "care", "hydration"]
         )
         XCTAssertNotNil(registry.module(with: BuiltInModuleID.workout))
         XCTAssertNil(registry.module(with: ModuleID("missing")))
@@ -86,21 +86,27 @@ final class ModuleRegistryTests: XCTestCase {
             BuiltInModuleID.workout,
             BuiltInModuleID.nutrition,
             BuiltInModuleID.care,
+            BuiltInModuleID.hydration,
         ]
 
         // Today, plan, insights, and history-aggregation capabilities ship
         // with the built-in adapters; Phase D moved reconciliation behind
         // the workout and care module boundaries. Phase E moved reminder
         // candidates and export definitions behind every module boundary.
+        // Phase F added hydration with all capabilities including insights.
         XCTAssertEqual(Set(registry.todayContributors.map { $0.metadata.id }), builtInIDs)
         XCTAssertEqual(Set(registry.planContributors.map { $0.metadata.id }), builtInIDs)
         XCTAssertEqual(
             Set(registry.insightsContributors.map { $0.metadata.id }),
-            [BuiltInModuleID.workout, BuiltInModuleID.nutrition]
+            Set([BuiltInModuleID.workout, BuiltInModuleID.nutrition, BuiltInModuleID.hydration])
         )
         XCTAssertEqual(
             Set(registry.reconcilers.map { $0.metadata.id }),
-            [BuiltInModuleID.workout, BuiltInModuleID.care]
+            Set([BuiltInModuleID.workout, BuiltInModuleID.care, BuiltInModuleID.hydration])
+        )
+        XCTAssertEqual(
+            Set(registry.historyContributors.map { $0.metadata.id }),
+            builtInIDs
         )
         XCTAssertEqual(Set(registry.reminderProviders.map { $0.metadata.id }), builtInIDs)
         XCTAssertEqual(Set(registry.exportProviders.map { $0.metadata.id }), builtInIDs)

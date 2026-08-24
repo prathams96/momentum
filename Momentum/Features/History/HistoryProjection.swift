@@ -6,6 +6,7 @@ enum HistoryCategory: String, CaseIterable, Identifiable, Sendable {
     case workouts
     case nutrition
     case care
+    case hydration
     case measurements
 
     var id: Self { self }
@@ -16,6 +17,7 @@ enum HistoryCategory: String, CaseIterable, Identifiable, Sendable {
         case .workouts: "Workout"
         case .nutrition: "Nutrition"
         case .care: "Care"
+        case .hydration: "Hydration"
         case .measurements: "Measurements"
         }
     }
@@ -109,13 +111,18 @@ enum HistoryProjection {
         }
 
         var activities: [DueAdherenceActivity] = []
-        for groupedCategory in [HistoryCategory.workouts, .nutrition, .care] {
+        for groupedCategory in [HistoryCategory.workouts, .nutrition, .care, .hydration] {
             let matching = selected.filter { $0.category == groupedCategory }
             guard !matching.isEmpty else { continue }
             if groupedCategory == .care {
                 activities.append(contentsOf: matching.map {
                     DueAdherenceActivity(kind: .morningCare, isCompleted: $0.isCompleted)
                 })
+            } else if groupedCategory == .hydration {
+                activities.append(DueAdherenceActivity(
+                    kind: .hydration,
+                    isCompleted: matching.contains(where: \.isCompleted)
+                ))
             } else {
                 activities.append(DueAdherenceActivity(
                     kind: groupedCategory == .workouts ? .workout : .nutritionFinalization,
