@@ -42,3 +42,23 @@ final class CareModuleAdapter: MomentumModule {
 
     init() {}
 }
+
+// MARK: - Plan contributions
+
+extension WorkoutModuleAdapter: PlanContributing {
+    func planSection(in context: ModuleContext) -> AnyView? {
+        AnyView(WorkoutPlanSection())
+    }
+}
+
+extension NutritionModuleAdapter: PlanContributing {
+    func planSection(in context: ModuleContext) -> AnyView? {
+        AnyView(NutritionPlanSection())
+    }
+}
+
+extension CareModuleAdapter: PlanContributing {
+    func planSection(in context: ModuleContext) -> AnyView? {
+        AnyView(CarePlanSection())
+    }
+}
