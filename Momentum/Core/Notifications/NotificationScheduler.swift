@@ -5,6 +5,7 @@ enum MomentumNotificationCategory {
     static let workoutDue = "WORKOUT_DUE"
     static let careDue = "CARE_DUE"
     static let eveningCheckIn = "EVENING_CHECKIN"
+    static let hydrationCheckIn = "HYDRATION_REMINDER"
 }
 
 enum MomentumNotificationAction {
@@ -98,7 +99,20 @@ actor NotificationScheduler {
             intentIdentifiers: []
         )
 
-        center.setNotificationCategories([workout, care, evening])
+        let hydration = UNNotificationCategory(
+            identifier: MomentumNotificationCategory.hydrationCheckIn,
+            actions: [
+                UNNotificationAction(
+                    identifier: MomentumNotificationAction.openToday,
+                    title: "Open Momentum",
+                    options: [.foreground]
+                ),
+                remind
+            ],
+            intentIdentifiers: []
+        )
+
+        center.setNotificationCategories([workout, care, evening, hydration])
     }
 
     func requestAuthorization() async throws -> Bool {

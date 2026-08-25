@@ -4,7 +4,7 @@ import SwiftData
 
 @MainActor
 final class CSVExportServiceTests: XCTestCase {
-    func testExportsFiveUTF8RFC4180FilesWithStableFormatting() async throws {
+    func testExportsSixUTF8RFC4180FilesWithStableFormatting() async throws {
         let container = try ModelContainerFactory.makePreview()
         let context = container.mainContext
         let timestamp = Date(timeIntervalSince1970: 0)
@@ -86,7 +86,7 @@ final class CSVExportServiceTests: XCTestCase {
         }.value
 
         XCTAssertEqual(Set(files.map(\.name)), Set([
-            "workouts.csv", "food.csv", "measurements.csv", "care.csv", "adherence.csv"
+            "workouts.csv", "food.csv", "measurements.csv", "care.csv", "hydration.csv", "adherence.csv"
         ]))
 
         let workoutURL = try XCTUnwrap(files.first { $0.name == "workouts.csv" }?.url)

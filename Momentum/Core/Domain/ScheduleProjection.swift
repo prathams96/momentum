@@ -23,7 +23,47 @@ enum ScheduleProjection {
         now: Date,
         calendar: Calendar
     ) -> WorkoutScheduleState {
-        let currentDay = currentDomainDay(settings: settings, now: now, calendar: calendar)
+        evaluate(
+            workouts: workouts,
+            anchors: anchors,
+            sessions: sessions,
+            domainDayCutoffMinutes: AppSettingsRecord.canonical(in: settings)?.domainDayCutoffMinutes ?? 180,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    static func evaluate(
+        workouts: [WorkoutTemplateRecord],
+        anchors: [CycleAnchorRecord],
+        sessions: [WorkoutSessionRecord],
+        domainDayCutoffMinutes: Int,
+        now: Date,
+        calendar: Calendar
+    ) -> WorkoutScheduleState {
+        let currentDay = DomainDay.containing(
+            now,
+            calendar: calendar,
+            cutoffMinutes: domainDayCutoffMinutes
+        )
+        return evaluate(
+            workouts: workouts,
+            anchors: anchors,
+            sessions: sessions,
+            currentDomainDay: currentDay,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    static func evaluate(
+        workouts: [WorkoutTemplateRecord],
+        anchors: [CycleAnchorRecord],
+        sessions: [WorkoutSessionRecord],
+        currentDomainDay currentDay: DomainDay,
+        now: Date,
+        calendar: Calendar
+    ) -> WorkoutScheduleState {
         guard let anchor = anchors.max(by: { $0.updatedAt < $1.updatedAt }),
               let firstDueDay = PersistedDomainDay.decode(anchor.firstDueDomainDay) else {
             return .needsRepair(reason: .missingAnchorWorkout)

@@ -278,17 +278,11 @@ private struct PostWorkoutCheckInView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Bindable var session: WorkoutSessionRecord
-    @Query private var settingsRecords: [AppSettingsRecord]
 
     @State private var heavySweating = false
     @State private var goingOutdoorsAgain = false
     @State private var note = ""
-    @State private var weight = ""
     @State private var saveError: String?
-
-    private var unitSystem: UnitSystemOption {
-        UnitSystemOption(rawValue: AppSettingsRecord.canonical(in: settingsRecords)?.unitSystemRaw ?? "metric") ?? .metric
-    }
 
     var body: some View {
         NavigationStack {
@@ -306,8 +300,6 @@ private struct PostWorkoutCheckInView: View {
                 }
 
                 Section("Optional") {
-                    TextField("Body weight (\(MeasurementKind.weight.unit(unitSystem: unitSystem)))", text: $weight)
-                        .keyboardType(.decimalPad)
                     TextField("Anything worth remembering?", text: $note, axis: .vertical)
                         .lineLimit(2...4)
                 }
@@ -339,16 +331,6 @@ private struct PostWorkoutCheckInView: View {
 
     private func save() {
         session.postWorkoutNote = note.isEmpty ? nil : note
-        if let value = Double(weight), value > 0,
-           let day = PersistedDomainDay.decode(session.completionDomainDay ?? session.scheduledDomainDay) {
-            modelContext.insert(BodyMeasurementRecord(
-                kindRaw: "weightKg",
-                value: MeasurementKind.weight.metricValue(displayValue: value, unitSystem: unitSystem),
-                measuredAt: .now,
-                domainDay: PersistedDomainDay.encode(day),
-                sourceRaw: "postWorkout"
-            ))
-        }
         if heavySweating {
             PostWorkoutCareService.ensureOccurrence(
                 for: session,

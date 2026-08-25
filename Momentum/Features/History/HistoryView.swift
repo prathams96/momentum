@@ -33,62 +33,43 @@ struct HistoryView: View {
         )
     }
 
+    private var canonicalSettings: AppSettingsRecord? {
+        AppSettingsRecord.canonical(in: settings)
+    }
+
+    private var moduleContextValue: ModuleContext {
+        ModuleContext.make(in: modelContext, settings: canonicalSettings, calendar: calendar)
+    }
+
+    private var historyContributors: [any HistoryContributing] {
+        ModuleRegistry.standard
+            .enabledModules(ModuleEnablementStore.enabledIDs(from: canonicalSettings))
+            .compactMap { $0 as? any HistoryContributing }
+    }
+
     private var adherenceFacts: [HistoryAdherenceFact] {
-        HistoryProjection.facts(
-            sessions: sessions,
-            workoutEvents: workoutEvents,
-            nutritionDays: nutritionDays,
-            careOccurrences: careOccurrences
-        )
+        historyContributors.flatMap { $0.historyFacts(in: moduleContextValue) }
     }
 
     private var filteredDays: [DomainDay] {
-        let sessionDays: [DomainDay] = category.includes(.workouts)
-            ? sessions.compactMap { session in
-                guard session.deletedAt == nil else { return nil }
-                return PersistedDomainDay.decode(
-                    session.completionDomainDay ?? session.scheduledDomainDay
-                )
-            }
-            : []
-        let eventDays: [DomainDay] = category.includes(.workouts)
-            ? workoutEvents.compactMap {
-                $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
-            }
-            : []
-        let nutritionFactDays: [DomainDay] = category.includes(.nutrition)
-            ? nutritionDays.compactMap { PersistedDomainDay.decode($0.domainDay) }
-                + foodEntries.compactMap {
-                    $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
-                }
-            : []
-        let careDays: [DomainDay] = category.includes(.care)
-            ? careOccurrences.compactMap { PersistedDomainDay.decode($0.dueDomainDay) }
-            : []
-        let measurementDays: [DomainDay] = category.includes(.measurements)
-            ? measurements.compactMap {
-                $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
-            }
-            : []
-
         var days = Set<DomainDay>()
-        days.formUnion(sessionDays)
-        days.formUnion(eventDays)
-        days.formUnion(nutritionFactDays)
-        days.formUnion(careDays)
-        days.formUnion(measurementDays)
+        // Modules report the days behind their own adherence facts.
+        days.formUnion(adherenceFacts.filter { category.includes($0.category) }.map(\.day))
+        if category.includes(.nutrition) {
+            // Facts only map finalized-day records; food-entry-only days stay visible.
+            days.formUnion(foodEntries.compactMap {
+                $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
+            })
+        }
         return days.sorted(by: >)
     }
 
-    private var streaks: HistoryStreakSummary {
-        HistoryProjection.streaks(facts: adherenceFacts, calendar: calendar)
-    }
-
     var body: some View {
+        let context = moduleContextValue
         List {
             Section {
                 Picker("Category", selection: $category) {
-                    ForEach(HistoryCategory.allCases) { option in
+                    ForEach(HistoryCategory.allCases.filter(\.isUserSelectable)) { option in
                         Text(option.title).tag(option)
                     }
                 }
@@ -107,7 +88,11 @@ struct HistoryView: View {
                     )
                 }
 
-                HistoryStreakSummaryView(summary: streaks, category: category)
+                HStack(spacing: MomentumSpacing.md) {
+                    ForEach(Array(historyContributors.enumerated()), id: \.offset) { _, contributor in
+                        streakTile(contributor, context: context)
+                    }
+                }
             }
 
             if filteredDays.isEmpty {
@@ -129,8 +114,7 @@ struct HistoryView: View {
                                 workoutEvents: workoutEvents,
                                 nutritionDays: nutritionDays,
                                 foodEntries: foodEntries,
-                                careOccurrences: careOccurrences,
-                                measurements: measurements
+                                careOccurrences: careOccurrences
                             )
                         }
                     }
@@ -139,45 +123,31 @@ struct HistoryView: View {
         }
         .navigationTitle("History")
         .navigationDestination(for: DomainDay.self) { day in
-            HistoryDayDetail(
-                day: day,
-                category: category,
-                sessions: sessions,
-                workoutEvents: workoutEvents,
-                nutritionDays: nutritionDays,
-                foodEntries: foodEntries,
-                careOccurrences: careOccurrences,
-                measurements: measurements,
-                editFood: { entry in
-                    presentedSheet = .editFood(id: entry.id, domainDay: entry.domainDay)
-                },
-                backdateFood: { entry in
-                    presentedSheet = .backdate(.food(id: entry.id, currentDay: entry.domainDay))
-                },
-                backdateMeasurement: { measurement in
-                    presentedSheet = .backdate(.measurement(
-                        id: measurement.id,
-                        currentDay: measurement.domainDay
-                    ))
-                },
-                requestFoodDeletion: { pendingDeletion = .food(id: $0.id) },
-                requestMeasurementDeletion: { pendingDeletion = .measurement(id: $0.id) },
-                requestWorkoutDeletion: requestWorkoutDeletion,
-                editWorkoutCompletion: { session in
-                    guard let finishedAt = session.finishedAt else { return }
-                    presentedSheet = .editWorkoutCompletion(
-                        id: session.id,
-                        currentCompletion: finishedAt
-                    )
-                },
-                toggleNutritionFinalization: toggleNutritionFinalization,
-                requestCareCompletionUndo: { occurrence in
-                    pendingCareUndo = HistoryCareUndoRequest(
-                        occurrenceID: occurrence.id,
-                        routineName: occurrence.routineNameSnapshot
-                    )
-                }
-            )
+            HistoryDayDetail(day: day)
+                .environment(\.historyDayActions, HistoryDayActions(
+                    editFood: { entry in
+                        presentedSheet = .editFood(id: entry.id, domainDay: entry.domainDay)
+                    },
+                    backdateFood: { entry in
+                        presentedSheet = .backdate(.food(id: entry.id, currentDay: entry.domainDay))
+                    },
+                    requestFoodDeletion: { pendingDeletion = .food(id: $0.id) },
+                    requestWorkoutDeletion: requestWorkoutDeletion,
+                    editWorkoutCompletion: { session in
+                        guard let finishedAt = session.finishedAt else { return }
+                        presentedSheet = .editWorkoutCompletion(
+                            id: session.id,
+                            currentCompletion: finishedAt
+                        )
+                    },
+                    toggleNutritionFinalization: toggleNutritionFinalization,
+                    requestCareCompletionUndo: { occurrence in
+                        pendingCareUndo = HistoryCareUndoRequest(
+                            occurrenceID: occurrence.id,
+                            routineName: occurrence.routineNameSnapshot
+                        )
+                    }
+                ))
         }
         .toolbar {
             if lastDeletion != nil {
@@ -241,6 +211,27 @@ struct HistoryView: View {
         } message: {
             Text(correctionError ?? "The correction was saved. Try refreshing again.")
         }
+    }
+
+    private func streakTile(
+        _ contributor: any HistoryContributing,
+        context: ModuleContext
+    ) -> some View {
+        let streak = contributor.categoryStreak(asOf: today, in: context) ?? 0
+        return VStack(alignment: .leading, spacing: 2) {
+            Label(contributor.metadata.displayName, systemImage: contributor.metadata.symbolName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text("\(streak)")
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+            Text(streak == 1 ? "opportunity/day" : "opportunities/days")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     private func requestWorkoutDeletion(_ session: WorkoutSessionRecord) {
@@ -349,6 +340,12 @@ struct HistoryView: View {
 }
 
 private extension HistoryCategory {
+    /// Measurements stay in schema and export but are no longer a filterable
+    /// history surface.
+    var isUserSelectable: Bool {
+        self != .measurements
+    }
+
     func includes(_ category: HistoryCategory) -> Bool {
         self == .all || self == category
     }

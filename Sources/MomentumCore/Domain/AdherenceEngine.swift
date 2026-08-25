@@ -7,6 +7,7 @@ public enum AdherenceActivityKind: Equatable, Sendable {
     case nightCare
     case hairCare
     case postWorkoutCare
+    case hydration
 }
 
 public struct DueAdherenceActivity: Equatable, Sendable {
@@ -28,15 +29,19 @@ public enum WorkoutAdherenceOutcome: Equatable, Sendable {
     case finished
     case missed
     case skipped
+    /// Module-disabled opportunity: neither extends nor resets the streak.
+    case paused
 }
 
 public struct NutritionAdherenceDay: Equatable, Sendable {
     public let day: DomainDay
     public let isFinalized: Bool
+    public let isPaused: Bool
 
-    public init(day: DomainDay, isFinalized: Bool) {
+    public init(day: DomainDay, isFinalized: Bool, isPaused: Bool = false) {
         self.day = day
         self.isFinalized = isFinalized
+        self.isPaused = isPaused
     }
 }
 
@@ -44,11 +49,25 @@ public struct CareAdherenceDay: Equatable, Sendable {
     public let day: DomainDay
     public let dueCount: Int
     public let completedCount: Int
+    public let isPaused: Bool
 
-    public init(day: DomainDay, dueCount: Int, completedCount: Int) {
+    public init(day: DomainDay, dueCount: Int, completedCount: Int, isPaused: Bool = false) {
         self.day = day
         self.dueCount = dueCount
         self.completedCount = completedCount
+        self.isPaused = isPaused
+    }
+}
+
+public struct HydrationAdherenceDay: Equatable, Sendable {
+    public let day: DomainDay
+    public let isTargetReached: Bool
+    public let isPaused: Bool
+
+    public init(day: DomainDay, isTargetReached: Bool, isPaused: Bool = false) {
+        self.day = day
+        self.isTargetReached = isTargetReached
+        self.isPaused = isPaused
     }
 }
 
@@ -77,6 +96,8 @@ public struct AdherenceEngine: Sendable {
                 streak += 1
             case .missed, .skipped:
                 streak = 0
+            case .paused:
+                break
             }
         }
         return streak
@@ -90,7 +111,10 @@ public struct AdherenceEngine: Sendable {
             days: days.sorted { $0.day < $1.day },
             calendar: calendar,
             domainDay: \.day,
-            outcome: { $0.isFinalized ? .completed : .incomplete }
+            outcome: { day in
+                if day.isPaused { return .neutral }
+                return day.isFinalized ? .completed : .incomplete
+            }
         )
     }
 
@@ -103,10 +127,28 @@ public struct AdherenceEngine: Sendable {
             calendar: calendar,
             domainDay: \.day,
             outcome: { day in
+                if day.isPaused { return .neutral }
                 if day.dueCount <= 0 {
                     return .neutral
                 }
                 return day.completedCount >= day.dueCount ? .completed : .incomplete
+            }
+        )
+    }
+
+    /// Consecutive eligible days with the hydration target reached. Paused
+    /// (module-disabled) days neither extend nor reset the streak.
+    public func hydrationStreak(
+        days: [HydrationAdherenceDay],
+        calendar: Calendar
+    ) -> Int {
+        streak(
+            days: days.sorted { $0.day < $1.day },
+            calendar: calendar,
+            domainDay: \.day,
+            outcome: { day in
+                if day.isPaused { return .neutral }
+                return day.isTargetReached ? .completed : .incomplete
             }
         )
     }

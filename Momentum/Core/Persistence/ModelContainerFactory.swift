@@ -45,7 +45,12 @@ enum ModelContainerFactory {
         CareOccurrenceRecord.self,
         CareTaskCompletionRecord.self,
         BodyMeasurementRecord.self,
-        MilestoneRecord.self
+        MilestoneRecord.self,
+        HydrationPlanRecord.self,
+        HydrationEntryRecord.self,
+        HydrationDayRecord.self,
+        ModuleFactRecord.self,
+        ModuleActivationIntervalRecord.self
     ])
 
     static func makeProduction() throws -> ModelContainer {
