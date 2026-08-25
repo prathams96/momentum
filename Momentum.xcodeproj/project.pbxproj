@@ -45,6 +45,7 @@
 		67FFD1531987A52C53484A14 /* NutritionInsightsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96BA40C86FDE53A493892C7F /* NutritionInsightsSection.swift */; };
 		69AE7B4140BE3B4A20690403 /* HistoryProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12F16B8301670302C305018F /* HistoryProjection.swift */; };
 		7097CF806D21DEFAA3CB673E /* WorkoutReconciliation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A552072490AA384D79E42D00 /* WorkoutReconciliation.swift */; };
+		70E274B91DE03963821E3149 /* ModuleEnablementLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C0D0C15ED8E1A5A4CC1C3A /* ModuleEnablementLedger.swift */; };
 		71D2B7FAE1BA1C17E82C3D46 /* HydrationReminderCandidates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1673FFAC3BF1D4F134B0E1AD /* HydrationReminderCandidates.swift */; };
 		7200927A37AF2DA4F60E8DF6 /* WorkoutHistorySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75B0C907D5D444CE7606837 /* WorkoutHistorySection.swift */; };
 		72725C7A39900A6DBEE280EA /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D090D983103C774D1A79F13 /* ModelContainerFactory.swift */; };
@@ -53,6 +54,7 @@
 		79CA5FFC5C0D53D21E3E029E /* NutritionPlanSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4BF09EB5ED5CABD36B134E /* NutritionPlanSection.swift */; };
 		7D266F79539CB07F450A2D7A /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACE83CB0C4A93124D0ECF85 /* NotificationScheduler.swift */; };
 		7DBA010A35B4FA8411CF8DBC /* HistoryProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8320054811E8FBF7C5B09A /* HistoryProjectionTests.swift */; };
+		7FFDA75AAA885F0B7E6D2169 /* StreakPauseLedgerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67CE1FA1A7EAB2331CA848FC /* StreakPauseLedgerTests.swift */; };
 		8304DD5E47917381A305A177 /* HydrationModuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9CDA7344B427A10DC7CA0F /* HydrationModuleTests.swift */; };
 		84DDD87F5BEFBE0804B7D508 /* HistoryAggregation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74DF0551D7D6CE8BC3054B55 /* HistoryAggregation.swift */; };
 		857D4D3231AFB78A8F5B2221 /* HistoryDayDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3D289714F38A88D41FFB6D /* HistoryDayDetail.swift */; };
@@ -136,6 +138,7 @@
 		1F069EA5615525C33194C090 /* PlanServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanServices.swift; sourceTree = "<group>"; };
 		1F95D448046A320D163B1F6B /* NutritionTodaySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionTodaySection.swift; sourceTree = "<group>"; };
 		22DC1ABD16BA9B2DF5B766C4 /* DecimalFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecimalFormatter.swift; sourceTree = "<group>"; };
+		24C0D0C15ED8E1A5A4CC1C3A /* ModuleEnablementLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleEnablementLedger.swift; sourceTree = "<group>"; };
 		259092A96922D22DC4AF0F98 /* DomainModuleAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainModuleAdapters.swift; sourceTree = "<group>"; };
 		26176FF7C01B2AA7B3CF9ED9 /* MomentumModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MomentumModule.swift; sourceTree = "<group>"; };
 		27D7BE776F3C0E24F9C600FE /* CareTodaySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareTodaySection.swift; sourceTree = "<group>"; };
@@ -156,6 +159,7 @@
 		5B9CDA7344B427A10DC7CA0F /* HydrationModuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationModuleTests.swift; sourceTree = "<group>"; };
 		5BCA2E4DAB4EEE451209E454 /* HydrationTodaySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationTodaySection.swift; sourceTree = "<group>"; };
 		630F0B52206EC55D4CB2FBF7 /* WorkoutExportDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutExportDefinition.swift; sourceTree = "<group>"; };
+		67CE1FA1A7EAB2331CA848FC /* StreakPauseLedgerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakPauseLedgerTests.swift; sourceTree = "<group>"; };
 		716D031DEF3DEDF9C4475B8B /* ScheduleProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleProjection.swift; sourceTree = "<group>"; };
 		729CEA7F15FF9B2A4D38AF54 /* MilestoneService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestoneService.swift; sourceTree = "<group>"; };
 		74AC9D94176EFF73B40D5D71 /* MeasurementSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementSupport.swift; sourceTree = "<group>"; };
@@ -364,6 +368,7 @@
 				422A3EBECB023337D7C3E1DF /* MomentumAppTests.swift */,
 				F65C7B1EBB5BC6C3B8A6C3DF /* ReconciliationOrchestrationTests.swift */,
 				97D5CFC5434D3E55A23F3368 /* SettingsPersistenceTests.swift */,
+				67CE1FA1A7EAB2331CA848FC /* StreakPauseLedgerTests.swift */,
 			);
 			path = MomentumTests;
 			sourceTree = "<group>";
@@ -382,6 +387,7 @@
 				259092A96922D22DC4AF0F98 /* DomainModuleAdapters.swift */,
 				74DF0551D7D6CE8BC3054B55 /* HistoryAggregation.swift */,
 				82AE02D0BD601BA8C5FDEDFE /* ModuleContext.swift */,
+				24C0D0C15ED8E1A5A4CC1C3A /* ModuleEnablementLedger.swift */,
 				F2EDE51F9D931D1A32B92D3D /* ModuleEnablementStore.swift */,
 				5854B858B13E27E908010D5D /* ModuleID.swift */,
 				7F5EC785C413FA6B001B2115 /* ModuleMetadata.swift */,
@@ -746,6 +752,7 @@
 				0D983FF24F7A035E05C272B7 /* MilestoneService.swift in Sources */,
 				72725C7A39900A6DBEE280EA /* ModelContainerFactory.swift in Sources */,
 				5481AF5A90AC64C1BA007630 /* ModuleContext.swift in Sources */,
+				70E274B91DE03963821E3149 /* ModuleEnablementLedger.swift in Sources */,
 				CAC25181DAD0945A8A9558C5 /* ModuleEnablementStore.swift in Sources */,
 				86486D706D385BC211C3E21B /* ModuleID.swift in Sources */,
 				F9A5F55E21BB31D38F352ED8 /* ModuleMetadata.swift in Sources */,
@@ -801,6 +808,7 @@
 				B214406AE014943969EDE500 /* MomentumAppTests.swift in Sources */,
 				B4D71AF3E0D5DBF6C7B55474 /* ReconciliationOrchestrationTests.swift in Sources */,
 				EE3C431329745C7CF955BCE3 /* SettingsPersistenceTests.swift in Sources */,
+				7FFDA75AAA885F0B7E6D2169 /* StreakPauseLedgerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
