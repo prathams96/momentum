@@ -21,18 +21,17 @@ final class HistoryProjectionTests: XCTestCase {
         XCTAssertEqual(days.last, DomainDay(year: 2026, month: 8, day: 2))
     }
 
-    func test_allCategoryScoreWeightsWorkoutNutritionAndEachCareRoutineEqually() {
+    func test_careCategoryCountsEachDueRoutineSeparatelyWithoutBlending() {
         let day = DomainDay(year: 2026, month: 8, day: 2)
         let facts = [
-            HistoryAdherenceFact(day: day, category: .workouts, isCompleted: true),
-            HistoryAdherenceFact(day: day, category: .nutrition, isCompleted: false),
             HistoryAdherenceFact(day: day, category: .care, isCompleted: true),
-            HistoryAdherenceFact(day: day, category: .care, isCompleted: false)
+            HistoryAdherenceFact(day: day, category: .care, isCompleted: false),
+            HistoryAdherenceFact(day: day, category: .workouts, isCompleted: true)
         ]
 
         XCTAssertEqual(
-            HistoryProjection.adherenceScore(on: day, facts: facts, category: .all),
-            .score(completedCount: 2, dueCount: 4, percentage: 50)
+            HistoryProjection.adherenceScore(on: day, facts: facts, category: .care),
+            .score(completedCount: 1, dueCount: 2, percentage: 50)
         )
     }
 

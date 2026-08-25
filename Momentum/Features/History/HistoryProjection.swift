@@ -1,8 +1,9 @@
 import Foundation
 import MomentumCore
 
+/// One adherence category. CONTEXT.md · Adherence Day: scores are strictly
+/// per category; there is no blended score anywhere.
 enum HistoryCategory: String, CaseIterable, Identifiable, Sendable {
-    case all
     case workouts
     case nutrition
     case care
@@ -13,10 +14,9 @@ enum HistoryCategory: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .all: "All"
         case .workouts: "Workout"
         case .nutrition: "Nutrition"
-        case .care: "Care"
+        case .care: "Personal care"
         case .hydration: "Hydration"
         case .measurements: "Measurements"
         }
@@ -104,7 +104,7 @@ enum HistoryProjection {
         category: HistoryCategory
     ) -> DailyAdherenceScore {
         let selected = facts.filter {
-            $0.day == day && (category == .all || $0.category == category)
+            $0.day == day && $0.category == category
         }
         guard category != .measurements else {
             return .noObligation

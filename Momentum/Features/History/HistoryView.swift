@@ -15,8 +15,6 @@ struct HistoryView: View {
     @Query private var careOccurrences: [CareOccurrenceRecord]
     @Query private var measurements: [BodyMeasurementRecord]
 
-    @State private var category: HistoryCategory = .all
-    @State private var heatmapPage = 0
     @State private var presentedSheet: HistorySheetDestination?
     @State private var pendingDeletion: HistoryDeletionRequest?
     @State private var lastDeletion: HistoryDeletionRequest?
@@ -41,64 +39,37 @@ struct HistoryView: View {
         ModuleContext.make(in: modelContext, settings: canonicalSettings, calendar: calendar)
     }
 
-    private var historyContributors: [any HistoryContributing] {
+    private var adherenceFacts: [HistoryAdherenceFact] {
         ModuleRegistry.standard
             .enabledModules(ModuleEnablementStore.enabledIDs(from: canonicalSettings))
             .compactMap { $0 as? any HistoryContributing }
-    }
-
-    private var adherenceFacts: [HistoryAdherenceFact] {
-        historyContributors.flatMap { $0.historyFacts(in: moduleContextValue) }
+            .flatMap { $0.historyFacts(in: moduleContextValue) }
     }
 
     private var filteredDays: [DomainDay] {
         var days = Set<DomainDay>()
         // Modules report the days behind their own adherence facts.
-        days.formUnion(adherenceFacts.filter { category.includes($0.category) }.map(\.day))
-        if category.includes(.nutrition) {
-            // Facts only map finalized-day records; food-entry-only days stay visible.
-            days.formUnion(foodEntries.compactMap {
-                $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
-            })
-        }
+        days.formUnion(adherenceFacts.map(\.day))
+        // Facts only map finalized-day records; food-entry-only days stay visible.
+        days.formUnion(foodEntries.compactMap {
+            $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
+        })
         return days.sorted(by: >)
     }
 
     var body: some View {
-        let context = moduleContextValue
         List {
-            Section {
-                Picker("Category", selection: $category) {
-                    ForEach(HistoryCategory.allCases.filter(\.isUserSelectable)) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .accessibilityHint("Filters the heatmap and chronological history")
-
-                HistoryHeatmapView(
-                    currentDay: today,
-                    page: $heatmapPage,
-                    calendar: calendar
-                ) { day in
-                    HistoryProjection.adherenceScore(
-                        on: day,
-                        facts: adherenceFacts,
-                        category: category
-                    )
-                }
-
-                HStack(spacing: MomentumSpacing.md) {
-                    ForEach(Array(historyContributors.enumerated()), id: \.offset) { _, contributor in
-                        streakTile(contributor, context: context)
-                    }
-                }
-            }
+            RhythmStripsSection(
+                title: nil,
+                settings: canonicalSettings,
+                currentDay: today,
+                calendar: calendar
+            )
 
             if filteredDays.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "No \(category.title.lowercased()) history",
+                        "No history yet",
                         systemImage: "calendar",
                         description: Text("Completed activities and logged facts will appear here.")
                     )
@@ -109,7 +80,6 @@ struct HistoryView: View {
                         NavigationLink(value: day) {
                             HistoryDayRow(
                                 day: day,
-                                category: category,
                                 sessions: sessions,
                                 workoutEvents: workoutEvents,
                                 nutritionDays: nutritionDays,
@@ -211,27 +181,6 @@ struct HistoryView: View {
         } message: {
             Text(correctionError ?? "The correction was saved. Try refreshing again.")
         }
-    }
-
-    private func streakTile(
-        _ contributor: any HistoryContributing,
-        context: ModuleContext
-    ) -> some View {
-        let streak = contributor.categoryStreak(asOf: today, in: context) ?? 0
-        return VStack(alignment: .leading, spacing: 2) {
-            Label(contributor.metadata.displayName, systemImage: contributor.metadata.symbolName)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Text("\(streak)")
-                .font(.title3.weight(.semibold))
-                .monospacedDigit()
-            Text(streak == 1 ? "opportunity/day" : "opportunities/days")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
     }
 
     private func requestWorkoutDeletion(_ session: WorkoutSessionRecord) {
@@ -336,17 +285,5 @@ struct HistoryView: View {
                 correctionError = "The correction was saved, but schedules and reminders could not be refreshed."
             }
         }
-    }
-}
-
-private extension HistoryCategory {
-    /// Measurements stay in schema and export but are no longer a filterable
-    /// history surface.
-    var isUserSelectable: Bool {
-        self != .measurements
-    }
-
-    func includes(_ category: HistoryCategory) -> Bool {
-        self == .all || self == category
     }
 }

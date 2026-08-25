@@ -97,11 +97,28 @@ struct TodayView: View {
     // MARK: - Consistency
 
     private var consistencySection: some View {
-        TodayConsistencySection(currentDay: currentDomainDay, calendar: calendar)
+        TodayConsistencySection(
+            settings: canonicalSettings,
+            currentDay: currentDomainDay,
+            calendar: calendar
+        )
     }
 }
 
-// MARK: - Daily thread visuals
+private struct TodayConsistencySection: View {
+    let settings: AppSettingsRecord?
+    let currentDay: DomainDay
+    let calendar: Calendar
+
+    var body: some View {
+        RhythmStripsSection(
+            title: "Consistency",
+            settings: settings,
+            currentDay: currentDay,
+            calendar: calendar
+        )
+    }
+}
 
 private struct DailyThreadHeader: View {
     let date: String
@@ -277,53 +294,5 @@ private struct DailyThreadStageView: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Consistency
-
-private struct TodayConsistencySection: View {
-    @Query private var sessions: [WorkoutSessionRecord]
-    @Query private var workoutEvents: [WorkoutDayEventRecord]
-    @Query private var nutritionDays: [NutritionDayRecord]
-    @Query private var careOccurrences: [CareOccurrenceRecord]
-
-    let currentDay: DomainDay
-    let calendar: Calendar
-
-    private var adherenceFacts: [HistoryAdherenceFact] {
-        let interval = MomentumDiagnostics.signposter.beginInterval("TodayAggregation")
-        defer {
-            MomentumDiagnostics.signposter.endInterval("TodayAggregation", interval)
-        }
-        return HistoryProjection.facts(
-            sessions: sessions,
-            workoutEvents: workoutEvents,
-            nutritionDays: nutritionDays,
-            careOccurrences: careOccurrences
-        )
-    }
-
-    private var adherenceStreaks: HistoryStreakSummary {
-        HistoryProjection.streaks(facts: adherenceFacts, calendar: calendar)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Consistency")
-                    .font(.title3.bold())
-                Spacer()
-                Text("Last 16 weeks")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            CompactHistoryHeatmapView(currentDay: currentDay, calendar: calendar) { day in
-                HistoryProjection.adherenceScore(on: day, facts: adherenceFacts, category: .all)
-            }
-
-            HistoryStreakSummaryView(summary: adherenceStreaks, category: .all)
-        }
     }
 }
