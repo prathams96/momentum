@@ -27,6 +27,7 @@ final class SettingsPersistenceTests: XCTestCase {
         draft.workoutNotificationMinutes = 19 * 60
         draft.nutritionReminderMinutes = 21 * 60 + 30
         draft.routineReminders[0].minutes = 8 * 60 + 45
+        draft.enabledModuleIDs = [BuiltInModuleID.workout, BuiltInModuleID.hydration]
         draft.apply(to: settings, routines: [routine, archived], now: updatedAt)
 
         XCTAssertEqual(settings.domainDayCutoffMinutes, 240)
@@ -38,6 +39,17 @@ final class SettingsPersistenceTests: XCTestCase {
         XCTAssertEqual(routine.notificationMinutes, 8 * 60 + 45)
         XCTAssertEqual(routine.updatedAt, updatedAt)
         XCTAssertEqual(archived.notificationMinutes, 10)
+        XCTAssertEqual(
+            ModuleEnablementStore.enabledIDs(from: settings),
+            [BuiltInModuleID.workout, BuiltInModuleID.hydration]
+        )
+
+        var allOffDraft = SettingsDraft(settings: settings, routines: [])
+        allOffDraft.enabledModuleIDs = []
+        allOffDraft.apply(to: settings, routines: [], now: updatedAt)
+
+        XCTAssertTrue(ModuleEnablementStore.enabledIDs(from: settings).isEmpty)
+        XCTAssertEqual(settings.updatedAt, updatedAt)
     }
 
     func testResetAllDataDeletesSeedAndHistoryRecords() throws {

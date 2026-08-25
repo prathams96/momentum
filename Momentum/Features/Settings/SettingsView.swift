@@ -25,6 +25,7 @@ struct SettingsView: View {
         Form {
             statusSection
             generalSection
+            modulesSection
             dailyRemindersSection
             careRemindersSection
             exportSection
@@ -184,10 +185,41 @@ struct SettingsView: View {
         }
     }
 
+    private var modulesSection: some View {
+        Section {
+            ForEach(ModuleRegistry.standard.modules, id: \.metadata.id) { module in
+                Toggle(isOn: moduleToggle(for: module.metadata.id)) {
+                    Label(module.metadata.displayName, systemImage: module.metadata.symbolName)
+                }
+            }
+        } header: {
+            Text("Modules")
+        } footer: {
+            Text("With a module off, its surfaces are hidden and its reminders are cancelled. History stays readable and your data is retained. Its streak pauses—never breaks—and resumes the day after you turn it back on.")
+        }
+    }
+
+    private func moduleToggle(for id: ModuleID) -> Binding<Bool> {
+        Binding(
+            get: { draft.enabledModuleIDs.contains(id) },
+            set: { isIncluded in
+                if isIncluded {
+                    draft.enabledModuleIDs.insert(id)
+                } else {
+                    draft.enabledModuleIDs.remove(id)
+                }
+            }
+        )
+    }
+
     private var dailyRemindersSection: some View {
         Section {
-            SettingsTimePicker(label: "Due workout", minutes: $draft.workoutNotificationMinutes)
-            SettingsTimePicker(label: "Unfinished nutrition", minutes: $draft.nutritionReminderMinutes)
+            if draft.enabledModuleIDs.contains(BuiltInModuleID.workout) {
+                SettingsTimePicker(label: "Due workout", minutes: $draft.workoutNotificationMinutes)
+            }
+            if draft.enabledModuleIDs.contains(BuiltInModuleID.nutrition) {
+                SettingsTimePicker(label: "Unfinished nutrition", minutes: $draft.nutritionReminderMinutes)
+            }
         } header: {
             Text("Daily reminders")
         } footer: {
@@ -197,8 +229,9 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var careRemindersSection: some View {
-        if !draft.routineReminders.isEmpty {
-            Section("Care reminders") {
+        if !draft.routineReminders.isEmpty,
+           draft.enabledModuleIDs.contains(BuiltInModuleID.care) {
+            Section("Personal care reminders") {
                 ForEach($draft.routineReminders) { $reminder in
                     SettingsTimePicker(label: reminder.name, minutes: $reminder.minutes)
                 }
