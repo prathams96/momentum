@@ -123,7 +123,13 @@ struct ProgressTabView: View {
                 facts: facts,
                 category: category,
                 through: context.currentDomainDay,
-                calendar: context.calendar
+                calendar: context.calendar,
+                pausedDays: ModuleEnablementLedger.pausedDays(
+                    for: module.metadata.id,
+                    through: context.currentDomainDay,
+                    calendar: context.calendar,
+                    in: context.modelContext
+                )
             )
             return (module.metadata.displayName, streak)
         }

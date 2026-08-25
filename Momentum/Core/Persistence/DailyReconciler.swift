@@ -34,8 +34,24 @@ enum DailyReconciler {
             calendar: calendar
         )
 
+        // Keep the enablement ledger in step before modules run so streak
+        // pause windows are recorded for the days they cover.
+        let enabledIDs = ModuleEnablementStore.enabledIDs(from: settings)
+        do {
+            try ModuleEnablementLedger.reconcile(
+                enabledIDs: enabledIDs,
+                currentDay: moduleContext.currentDomainDay,
+                in: context,
+                registry: registry
+            )
+        } catch {
+            logger.error(
+                "Enablement ledger reconcile failed: \(String(describing: error), privacy: .public)"
+            )
+        }
+
         let reconcilers = registry
-            .enabledModules(ModuleEnablementStore.enabledIDs(from: settings))
+            .enabledModules(enabledIDs)
             .compactMap { $0 as? any ReconcilingModule }
         for reconciler in reconcilers {
             do {

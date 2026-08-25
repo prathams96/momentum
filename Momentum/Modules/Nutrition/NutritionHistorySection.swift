@@ -25,7 +25,13 @@ extension NutritionModuleAdapter: HistoryContributing {
             facts: historyFacts(in: context),
             category: .nutrition,
             through: day,
-            calendar: context.calendar
+            calendar: context.calendar,
+            pausedDays: ModuleEnablementLedger.pausedDays(
+                for: metadata.id,
+                through: day,
+                calendar: context.calendar,
+                in: context.modelContext
+            )
         )
     }
 }

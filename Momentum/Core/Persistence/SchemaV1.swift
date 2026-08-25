@@ -969,3 +969,33 @@ final class ModuleFactRecord {
         self.createdAt = createdAt
     }
 }
+
+/// One enabled stretch of a module's life, used to pause Category Streaks
+/// across disabled intervals (parent spec §3.3). `enabledFromDomainDay` of ""
+/// means "since forever" (the back-compat sentinel for modules never
+/// disabled); `enabledToDomainDay` nil means still enabled.
+@Model
+final class ModuleActivationIntervalRecord {
+    var id: UUID = UUID()
+    var moduleIDRaw: String = ""
+    var enabledFromDomainDay: String = ""
+    var enabledToDomainDay: String?
+    var createdAt: Date = Foundation.Date()
+    var updatedAt: Date = Foundation.Date()
+
+    init(
+        id: UUID = UUID(),
+        moduleIDRaw: String,
+        enabledFromDomainDay: String,
+        enabledToDomainDay: String? = nil,
+        createdAt: Date = .now,
+        updatedAt: Date = .now
+    ) {
+        self.id = id
+        self.moduleIDRaw = moduleIDRaw
+        self.enabledFromDomainDay = enabledFromDomainDay
+        self.enabledToDomainDay = enabledToDomainDay
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}

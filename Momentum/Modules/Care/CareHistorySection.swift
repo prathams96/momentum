@@ -25,7 +25,13 @@ extension CareModuleAdapter: HistoryContributing {
             facts: historyFacts(in: context),
             category: .care,
             through: day,
-            calendar: context.calendar
+            calendar: context.calendar,
+            pausedDays: ModuleEnablementLedger.pausedDays(
+                for: metadata.id,
+                through: day,
+                calendar: context.calendar,
+                in: context.modelContext
+            )
         )
     }
 }

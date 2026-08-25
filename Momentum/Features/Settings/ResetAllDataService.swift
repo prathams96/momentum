@@ -30,6 +30,7 @@ enum ResetAllDataService {
             try delete(HydrationEntryRecord.self, from: context)
             try delete(HydrationDayRecord.self, from: context)
             try delete(ModuleFactRecord.self, from: context)
+            try delete(ModuleActivationIntervalRecord.self, from: context)
             try context.save()
         } catch {
             context.rollback()

@@ -245,10 +245,19 @@ extension HydrationModuleAdapter: HistoryContributing {
 
     func categoryStreak(asOf day: DomainDay, in context: ModuleContext) -> Int? {
         let facts = historyFacts(in: context).filter { $0.day <= day }
+        let pausedDays = ModuleEnablementLedger.pausedDays(
+            for: metadata.id,
+            through: day,
+            calendar: context.calendar,
+            in: context.modelContext
+        )
+        let recordedDays = Set(facts.map(\.day))
         let engine = AdherenceEngine()
         let adherenceDays = facts.map {
             HydrationAdherenceDay(day: $0.day, isTargetReached: $0.isCompleted)
-        }
+        } + pausedDays
+            .filter { !recordedDays.contains($0) }
+            .map { HydrationAdherenceDay(day: $0, isTargetReached: false, isPaused: true) }
         return engine.hydrationStreak(days: adherenceDays, calendar: context.calendar)
     }
 }
