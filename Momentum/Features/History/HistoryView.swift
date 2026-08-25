@@ -46,12 +46,23 @@ struct HistoryView: View {
             .flatMap { $0.historyFacts(in: moduleContextValue) }
     }
 
+    private var enabledIDs: Set<ModuleID> {
+        ModuleEnablementStore.enabledIDs(from: canonicalSettings)
+    }
+
     private var filteredDays: [DomainDay] {
         var days = Set<DomainDay>()
-        // Modules report the days behind their own adherence facts.
+        // Enabled modules report the days behind their own adherence facts.
         days.formUnion(adherenceFacts.map(\.day))
-        // Facts only map finalized-day records; food-entry-only days stay visible.
-        days.formUnion(foodEntries.compactMap {
+        if enabledIDs.contains(BuiltInModuleID.nutrition) {
+            // Facts only map finalized-day records; food-entry-only days stay visible.
+            days.formUnion(foodEntries.compactMap {
+                $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
+            })
+        }
+        // Measurements are Core-owned facts: their days stay readable even
+        // though no module claims them.
+        days.formUnion(measurements.compactMap {
             $0.deletedAt == nil ? PersistedDomainDay.decode($0.domainDay) : nil
         })
         return days.sorted(by: >)

@@ -128,9 +128,24 @@ enum DailyReconciler {
             .enabledModules(enabled)
             .compactMap { $0 as? any ReminderCandidateProviding }
         let candidates = providers.flatMap { $0.reminderCandidates(in: moduleContext) }
+
+        // The evening anchor's configured time, used to seed a merged Evening
+        // check-in when no module supplied an anchor candidate (spec §6).
+        let fallbackAnchorDateComponents: DateComponents? = settings.map { settings in
+            let minutes = settings.nutritionReminderMinutes
+            let date = PersistedDomainDay.date(
+                for: moduleContext.currentDomainDay,
+                calendar: calendar,
+                hour: minutes / 60,
+                minute: minutes % 60
+            ) ?? now
+            return calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        }
+
         return ReminderBundler.bundle(
             candidates,
-            anchorCategory: MomentumNotificationCategory.eveningCheckIn
+            anchorCategory: MomentumNotificationCategory.eveningCheckIn,
+            fallbackAnchorDateComponents: fallbackAnchorDateComponents
         )
     }
 

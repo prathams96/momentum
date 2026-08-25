@@ -67,7 +67,7 @@ struct HydrationTodaySection: View {
                 .font(.title3.bold())
 
             VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
-                Text("\(HydrationVolumeFormatting.volume(consumedML)) of \(HydrationVolumeFormatting.volume(targetML))")
+                Text("\(HydrationVolumeFormatting.volume(consumedML, unitSystem: unitSystem)) of \(HydrationVolumeFormatting.volume(targetML, unitSystem: unitSystem))")
                     .font(.headline.monospacedDigit())
 
                 GeometryReader { proxy in
@@ -146,7 +146,7 @@ struct HydrationTodaySection: View {
     }
 
     private var accessibilitySummary: String {
-        "Hydration. \(HydrationVolumeFormatting.litres(consumedML)) litres of \(HydrationVolumeFormatting.litres(targetML)) litre daily target. \(HydrationVolumeFormatting.percentage(of: consumedML, targetML: targetML)) percent."
+        "Hydration. \(HydrationVolumeFormatting.volume(consumedML, unitSystem: unitSystem)) of \(HydrationVolumeFormatting.volume(targetML, unitSystem: unitSystem)) daily target. \(HydrationVolumeFormatting.percentage(of: consumedML, targetML: targetML)) percent."
     }
 
     private func presetLabel(_ amountML: Int) -> String {
@@ -302,7 +302,10 @@ extension HydrationModuleAdapter: TodayContributing {
         return TodayContribution(
             metadata: metadata,
             state: state,
-            accessibilitySummary: "Hydration. \(HydrationVolumeFormatting.litres(total)) litres of \(HydrationVolumeFormatting.litres(targetML)) litre daily target. \(HydrationVolumeFormatting.percentage(of: total, targetML: targetML)) percent."
+            accessibilitySummary: {
+            let unit = UnitSystemOption(rawValue: context.unitSystemRaw) ?? .metric
+            return "Hydration. \(HydrationVolumeFormatting.volume(total, unitSystem: unit)) of \(HydrationVolumeFormatting.volume(targetML, unitSystem: unit)) daily target. \(HydrationVolumeFormatting.percentage(of: total, targetML: targetML)) percent."
+        }()
         )
     }
 

@@ -424,8 +424,16 @@ struct SettingsView: View {
     private func persistSettings() {
         guard let settings else { return }
         isSaving = true
+        let previousEnabledIDs = savedDraft?.enabledModuleIDs ?? draft.enabledModuleIDs
+        let newlyEnabled = draft.enabledModuleIDs.subtracting(previousEnabledIDs)
         draft.apply(to: settings, routines: activeRoutines)
         do {
+            // Later-enabled modules get their defaults lazily (spec §4).
+            try ModuleSetup.ensureDefaults(
+                for: newlyEnabled,
+                unitSystemRaw: settings.unitSystemRaw,
+                in: modelContext
+            )
             try modelContext.save()
             savedDraft = draft
             isSaving = false

@@ -133,7 +133,7 @@ struct OnboardingView: View {
                     .font(.largeTitle.bold())
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("Momentum turns today’s obligations into a small, concrete sequence—workout, food, and care in one private place.")
+                Text("Momentum turns today’s obligations into a small, concrete sequence—workout, food, and personal care in one private place.")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
@@ -217,7 +217,7 @@ struct OnboardingView: View {
                 Text("Starting empty")
                     .font(.title.bold())
 
-                Text("Your plans stay empty for now. You can add workouts and care routines any time in Plans, or install the example plan later from Settings.")
+                Text("Your plans stay empty for now. You can add workouts and personal care routines any time in Plans, or install the example plan later from Settings.")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
@@ -288,7 +288,7 @@ struct OnboardingView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
 
             VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-                Text("Your care plan")
+                Text("Your personal care plan")
                     .font(.title3.bold())
 
                 CarePreviewRow(
@@ -410,7 +410,7 @@ struct OnboardingView: View {
             Label("Reminders, only when useful", systemImage: "bell.badge")
                 .font(.headline)
 
-            Text("Momentum uses local reminders for care and a due workout. Denying permission never blocks the app.")
+            Text("Momentum uses local reminders for personal care and a due workout. Denying permission never blocks the app.")
                 .font(.body)
                 .foregroundStyle(.secondary)
 
@@ -667,7 +667,11 @@ struct OnboardingView: View {
             await requestNotificationPermission(showError: false)
         }
 
-        let originalSettings = (onboardingCompleted: settings.onboardingCompleted, updatedAt: settings.updatedAt)
+        let originalSettings = (
+            onboardingCompleted: settings.onboardingCompleted,
+            updatedAt: settings.updatedAt,
+            enabledModulesRaw: settings.enabledModulesRaw
+        )
         let anchor = anchors.max(by: { $0.updatedAt < $1.updatedAt })
         let originalAnchor = anchor.map {
             (nextWorkoutTemplateID: $0.nextWorkoutTemplateID, firstDueDomainDay: $0.firstDueDomainDay, updatedAt: $0.updatedAt)
@@ -752,6 +756,7 @@ struct OnboardingView: View {
         } catch {
             settings.onboardingCompleted = originalSettings.onboardingCompleted
             settings.updatedAt = originalSettings.updatedAt
+            settings.enabledModulesRaw = originalSettings.enabledModulesRaw
             if trackNutrition, existingTarget == nil {
                 modelContext.delete(target)
             }

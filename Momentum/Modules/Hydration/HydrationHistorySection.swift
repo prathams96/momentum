@@ -45,7 +45,7 @@ struct HydrationHistoryDaySection: View {
         Section("Hydration") {
             LabeledContent(
                 "Day total",
-                value: "\(HydrationVolumeFormatting.volume(totalML)) of \(HydrationVolumeFormatting.volume(targetML))"
+                value: "\(HydrationVolumeFormatting.volume(totalML, unitSystem: unitSystem)) of \(HydrationVolumeFormatting.volume(targetML, unitSystem: unitSystem))"
             )
             Label(
                 totalML >= targetML ? "Target reached" : "Target not reached",
@@ -63,7 +63,7 @@ struct HydrationHistoryDaySection: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(HydrationVolumeFormatting.volume(entry.amountML))
+                        Text(HydrationVolumeFormatting.volume(entry.amountML, unitSystem: unitSystem))
                             .monospacedDigit()
                     }
                     .accessibilityElement(children: .combine)

@@ -44,7 +44,7 @@ enum RhythmCellPresentation: Equatable {
             return Color.secondary.opacity(0.10)
         case .noObligation:
             return .clear
-        case let .scored:
+        case .scored:
             return MomentumTheme.pulse.opacity(Self.tonalOpacities[tonalStep ?? 0])
         }
     }
@@ -96,15 +96,36 @@ struct HistoryHeatmapView: View {
     var pausedDays: Set<DomainDay> = []
     let score: (DomainDay) -> DailyAdherenceScore
 
-    private var days: [DomainDay] {
-        HistoryProjection.heatmapDays(
+    /// Week columns (Monday-first), so VoiceOver can group by week.
+    private var weeks: [[DomainDay]] {
+        let days = HistoryProjection.heatmapDays(
             endingOn: currentDay.adding(days: page * 16 * 7, calendar: calendar),
             calendar: calendar
         )
+        return stride(from: 0, to: days.count, by: 7).map { Array(days[$0..<min($0 + 7, days.count)]) }
     }
 
     private func presentation(for day: DomainDay) -> RhythmCellPresentation {
         RhythmCellPresentation(score: score(day), isPaused: pausedDays.contains(day))
+    }
+
+    private func weekSummary(_ week: [DomainDay]) -> String {
+        guard let first = week.first else { return "" }
+        func scoredPercentage(_ p: RhythmCellPresentation) -> Double? {
+            if case let .scored(percentage) = p { return percentage }
+            return nil
+        }
+
+        let presentations = week.map { presentation(for: $0) }
+        let percentages = presentations.compactMap(scoredPercentage)
+        let complete = percentages.count(where: { $0 >= 99.5 })
+        let partial = percentages.count(where: { $0 > 0 && $0 < 99.5 })
+        let missed = percentages.count(where: { $0 <= 0 })
+        let noObligation = presentations.count(where: { $0 == .noObligation })
+        let paused = presentations.count(where: { $0 == .paused })
+        let start = first.historyDate?.formatted(date: .abbreviated, time: .omitted)
+            ?? PersistedDomainDay.encode(first)
+        return "Week of \(start). \(complete) complete, \(partial) partial, \(missed) missed, \(noObligation) without obligation, \(paused) paused, not broken."
     }
 
     var body: some View {
@@ -133,30 +154,26 @@ struct HistoryHeatmapView: View {
             }
 
             HStack(alignment: .top, spacing: MomentumSpacing.xs) {
-                VStack(spacing: 3) {
+                VStack(spacing: cellPitch - cellSize) {
                     ForEach(weekdayLabels, id: \.self) { label in
                         Text(label)
-                            .font(.system(size: 8))
+                            .font(.system(size: 9))
                             .foregroundStyle(.secondary)
-                            .frame(width: 16, height: 16)
+                            .frame(width: 18, height: cellPitch)
                             .accessibilityHidden(true)
                     }
                 }
 
                 ScrollView(.horizontal) {
-                    LazyHGrid(
-                        rows: Array(repeating: GridItem(.fixed(16), spacing: 3), count: 7),
-                        spacing: 3
-                    ) {
-                        ForEach(days, id: \.self) { day in
-                            let presentation = presentation(for: day)
-                            NavigationLink(value: day) {
-                                RhythmDayCell(presentation: presentation)
-                                    .frame(width: 16, height: 16)
+                    LazyHStack(spacing: cellPitch - cellSize) {
+                        ForEach(Array(weeks.enumerated()), id: \.offset) { _, week in
+                            VStack(spacing: cellPitch - cellSize) {
+                                ForEach(week, id: \.self) { day in
+                                    dayCell(day)
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(presentation.accessibilityLabel(for: day))
-                            .accessibilityHint("Opens history for this day")
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel(weekSummary(week))
                         }
                     }
                     .padding(.vertical, 1)
@@ -169,19 +186,46 @@ struct HistoryHeatmapView: View {
         .accessibilityElement(children: .contain)
     }
 
+    private let cellSize: CGFloat = 20
+    private var cellPitch: CGFloat { cellSize + 3 }
+
+    private func dayCell(_ day: DomainDay) -> some View {
+        let presentation = presentation(for: day)
+        return NavigationLink(value: day) {
+            RhythmDayCell(presentation: presentation)
+                .frame(width: cellSize, height: cellSize)
+                // Generous hit area around the small visual cell.
+                .frame(width: max(cellSize, 32), height: max(cellSize, 32))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(cellAccessibilityLabel(for: day, presentation: presentation))
+        .accessibilityHint("Opens history for this day")
+    }
+
+    private func cellAccessibilityLabel(
+        for day: DomainDay,
+        presentation: RhythmCellPresentation
+    ) -> String {
+        let base = presentation.accessibilityLabel(for: day)
+        guard case let .score(completed, due, _) = score(day), due > 0 else { return base }
+        return "\(base), \(completed) of \(due) completed"
+    }
+
     private var legend: some View {
         HStack(spacing: MomentumSpacing.xs) {
-            RhythmDayCell(presentation: .noObligation).frame(width: 13, height: 13)
-            Text("No obligation")
-            RhythmDayCell(presentation: .paused).frame(width: 13, height: 13)
-            Text("Paused")
-            ForEach([0.35, 0.55, 0.75, 1.0], id: \.self) { opacity in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(MomentumTheme.pulse.opacity(opacity))
-                    .frame(width: 13, height: 13)
-                    .accessibilityHidden(true)
+            LegendSwatch(presentation: .noObligation, title: "No obligation")
+            LegendSwatch(presentation: .paused, title: "Paused")
+            LegendSwatch(presentation: .scored(percentage: 0), title: "Missed")
+            HStack(spacing: 2) {
+                ForEach([0.35, 0.55, 0.75, 1.0], id: \.self) { opacity in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(MomentumTheme.pulse.opacity(opacity))
+                        .frame(width: 13, height: 13)
+                        .accessibilityHidden(true)
+                }
             }
-            Text("Complete")
+            Text("Partial → Complete")
         }
         .font(.caption2)
         .foregroundStyle(.secondary)
@@ -189,14 +233,28 @@ struct HistoryHeatmapView: View {
     }
 
     private var rangeLabel: String {
-        guard let first = days.first?.historyDate,
-              let last = days.last?.historyDate else { return "16 weeks" }
+        guard let first = weeks.first?.first?.historyDate,
+              let last = weeks.last?.last?.historyDate else { return "16 weeks" }
         return "\(first.formatted(.dateTime.month(.abbreviated).day()))–\(last.formatted(.dateTime.month(.abbreviated).day().year()))"
     }
 
     private var weekdayLabels: [String] {
         let symbols = calendar.veryShortWeekdaySymbols
         return Array(symbols.dropFirst()) + Array(symbols.prefix(1))
+    }
+}
+
+private struct LegendSwatch: View {
+    let presentation: RhythmCellPresentation
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 3) {
+            RhythmDayCell(presentation: presentation)
+                .frame(width: 13, height: 13)
+            Text(title)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

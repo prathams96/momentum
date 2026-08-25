@@ -12,9 +12,34 @@ enum ReminderBundler {
     static func bundle(
         _ candidates: [ScheduledReminder],
         anchorCategory: String,
-        proximityMinutes: Int = 30
+        proximityMinutes: Int = 30,
+        fallbackAnchorDateComponents: DateComponents? = nil
     ) -> [ScheduledReminder] {
         let anchors = candidates.filter { $0.categoryIdentifier == anchorCategory }
+
+        // One-notification-max guarantee (spec §6): when no module supplied
+        // an anchor (e.g. nutrition disabled or already finalized), Core's
+        // fallback time seeds a synthetic Evening check-in so nearby
+        // candidates still merge instead of firing individually.
+        if anchors.isEmpty, let fallback = fallbackAnchorDateComponents {
+            let nearby = candidates.filter {
+                firesWithin($0.dateComponents, of: fallback, minutes: proximityMinutes)
+            }
+            guard !nearby.isEmpty else { return candidates }
+            let anchor = ScheduledReminder(
+                identifier: "evening.checkin.merged",
+                title: "Evening check-in",
+                body: "",
+                categoryIdentifier: anchorCategory,
+                dateComponents: nearby.map(\.dateComponents).reduce(fallback) {
+                    minuteOfDay($0) <= minuteOfDay($1) ? $0 : $1
+                },
+                userInfo: [:]
+            )
+            return [merge(nearby, into: anchor)]
+                + candidates.filter { !Set(nearby).contains($0) }
+        }
+
         guard !anchors.isEmpty else { return candidates }
 
         var mergedByAnchor: [String: (anchor: ScheduledReminder, merged: [ScheduledReminder])] = [:]
@@ -61,6 +86,7 @@ enum ReminderBundler {
         into anchor: ScheduledReminder
     ) -> ScheduledReminder {
         let fragments = ([anchor.body] + merged.map(\.body))
+            .filter { !$0.isEmpty }
             .map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 }
         let earliest = merged
             .map(\.dateComponents)

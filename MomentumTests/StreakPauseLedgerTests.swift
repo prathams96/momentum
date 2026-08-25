@@ -111,7 +111,7 @@ final class StreakPauseLedgerTests: XCTestCase {
     }
 
     func testModulesWithNoLedgerHistoryPauseNothing() throws {
-        try withStore { context in
+        withStore { context in
             let paused = ModuleEnablementLedger.pausedDays(
                 for: BuiltInModuleID.hydration,
                 through: day(2026, 8, 20),

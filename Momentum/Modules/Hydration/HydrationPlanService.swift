@@ -17,7 +17,7 @@ enum HydrationPlanService {
         unitSystemRaw: String = "metric"
     ) -> HydrationPlanRecord {
         let existing = (try? context.fetch(FetchDescriptor<HydrationPlanRecord>())) ?? []
-        if let canonical = existing.min { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) } {
+        if let canonical = existing.min(by: { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) }) {
             return canonical
         }
         let imperial = unitSystemRaw == UnitSystemOption.imperial.rawValue
