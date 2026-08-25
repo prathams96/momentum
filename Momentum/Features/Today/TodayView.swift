@@ -87,32 +87,11 @@ struct TodayView: View {
     }
 
     private func dailyThreadStages(from contributions: [TodayContribution]) -> [DailyThreadStageModel] {
-        var stages = contributions.map { contribution in
-            DailyThreadStageModel(
-                title: contribution.title,
-                symbol: contribution.symbolName,
-                tint: contribution.tint,
-                isFocused: false
-            )
-        }
-        stages.append(DailyThreadStageModel(title: "Reflect", symbol: "chart.xyaxis.line", tint: nil, isFocused: false))
-
-        if let focusIndex = contributions.firstIndex(where: { $0.state != .completed }) {
-            stages[focusIndex].isFocused = true
-        } else {
-            stages[stages.count - 1].isFocused = true
-        }
-        return stages
+        DailyThreadFocus.stages(from: contributions)
     }
 
     private func dailyThreadCallout(contributions: [TodayContribution], stages: [DailyThreadStageModel]) -> String {
-        if let attention = contributions.first(where: { $0.state == .attention }) {
-            return attention.title == "Workout" ? "Repair workout plan" : "\(attention.title) needs attention"
-        }
-        if let focused = stages.first(where: \.isFocused) {
-            return "\(focused.title) next"
-        }
-        return "Reflect next"
+        DailyThreadFocus.callout(contributions: contributions, stages: stages)
     }
 
     // MARK: - Consistency
@@ -123,15 +102,6 @@ struct TodayView: View {
 }
 
 // MARK: - Daily thread visuals
-
-struct DailyThreadStageModel: Identifiable {
-    let title: String
-    let symbol: String
-    let tint: Color?
-    var isFocused: Bool
-
-    var id: String { title }
-}
 
 private struct DailyThreadHeader: View {
     let date: String
@@ -145,7 +115,7 @@ private struct DailyThreadHeader: View {
     @State private var isRevealed = false
 
     private var focusedTitle: String {
-        stages.first(where: \.isFocused)?.title ?? "Reflect"
+        stages.first(where: \.isFocused)?.title ?? ""
     }
 
     private var stageSummary: String {
