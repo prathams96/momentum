@@ -40,15 +40,13 @@ enum DailyThreadFocus {
         return stages
     }
 
-    static func callout(
-        contributions: [TodayContribution],
-        stages: [DailyThreadStageModel]
-    ) -> String {
+    /// The Today callout copy derived from the same rule as the focus node.
+    static func callout(contributions: [TodayContribution]) -> String {
         if let attention = contributions.first(where: { $0.state == .attention }) {
             return "\(attention.title) needs attention"
         }
-        if let focused = stages.first(where: \.isFocused) {
-            return "\(focused.title) next"
+        if let focus = contributions.first(where: { isIncomplete($0.state) }) {
+            return "\(focus.title) next"
         }
         return "All done for today"
     }

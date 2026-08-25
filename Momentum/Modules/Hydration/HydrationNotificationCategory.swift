@@ -13,10 +13,7 @@ extension HydrationModuleAdapter: NotificationCategoryProviding {
                     title: "Open Momentum",
                     options: [.foreground]
                 ),
-                UNNotificationAction(
-                    identifier: MomentumNotificationAction.remindInThirtyMinutes,
-                    title: "Remind in 30 minutes"
-                ),
+                NotificationScheduler.remindInThirtyMinutesAction(),
             ],
             intentIdentifiers: []
         )

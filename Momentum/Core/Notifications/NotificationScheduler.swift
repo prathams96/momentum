@@ -99,6 +99,13 @@ actor NotificationScheduler {
         center.setNotificationCategories(Set(coreCategories() + moduleCategories))
     }
 
+    static func remindInThirtyMinutesAction() -> UNNotificationAction {
+        UNNotificationAction(
+            identifier: MomentumNotificationAction.remindInThirtyMinutes,
+            title: "Remind in 30 minutes"
+        )
+    }
+
     func requestAuthorization() async throws -> Bool {
         try await center.requestAuthorization(options: [.alert, .sound, .badge])
     }

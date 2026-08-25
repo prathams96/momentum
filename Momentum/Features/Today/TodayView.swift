@@ -89,7 +89,7 @@ struct TodayView: View {
             date: PersistedDomainDay.date(for: currentDomainDay, calendar: calendar)?.formatted(date: .complete, time: .omitted) ?? "Today",
             accessibilityDate: PersistedDomainDay.date(for: currentDomainDay, calendar: calendar)?.formatted(date: .abbreviated, time: .omitted) ?? "Today",
             stages: stages,
-            callout: dailyThreadCallout(contributions: contributions, stages: stages)
+            callout: dailyThreadCallout(contributions)
         )
     }
 
@@ -97,8 +97,8 @@ struct TodayView: View {
         DailyThreadFocus.stages(from: contributions)
     }
 
-    private func dailyThreadCallout(contributions: [TodayContribution], stages: [DailyThreadStageModel]) -> String {
-        DailyThreadFocus.callout(contributions: contributions, stages: stages)
+    private func dailyThreadCallout(_ contributions: [TodayContribution]) -> String {
+        DailyThreadFocus.callout(contributions: contributions)
     }
 
     /// The app-level empty state (pre-launch spec §4): one quiet line with a

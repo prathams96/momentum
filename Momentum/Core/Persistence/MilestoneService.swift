@@ -285,34 +285,46 @@ enum MilestoneService {
     private static func exerciseCandidates(
         performanceFacts facts: [MilestoneFact]
     ) -> [MilestoneCandidate] {
+        struct Performance {
+            let prescriptionID: UUID
+            let weightKg: Double
+            let repetitions: Int
+            let at: Date
+        }
+
         var candidates = [MilestoneCandidate]()
         for (prescriptionID, performances) in Dictionary(
-            grouping: facts.compactMap { fact -> (UUID, Double, Int, Date)? in
+            grouping: facts.compactMap { fact -> Performance? in
                 if case let .exercisePerformance(id, weightKg, repetitions, at) = fact {
-                    return (id, weightKg, repetitions, at)
+                    return Performance(
+                        prescriptionID: id,
+                        weightKg: weightKg,
+                        repetitions: repetitions,
+                        at: at
+                    )
                 }
                 return nil
             },
-            by: \.0
+            by: \.prescriptionID
         ) {
             if let weightBest = performances.max(by: {
-                ($0.1, $0.2, $0.3) < ($1.1, $1.2, $1.3)
-            }), weightBest.1 > 0 {
+                ($0.weightKg, $0.repetitions, $0.at) < ($1.weightKg, $1.repetitions, $1.at)
+            }), weightBest.weightKg > 0 {
                 candidates.append(MilestoneCandidate(
                     kind: exerciseWeightBestKind,
-                    threshold: weightBest.1,
+                    threshold: weightBest.weightKg,
                     relatedEntityID: prescriptionID,
-                    earnedAt: weightBest.3
+                    earnedAt: weightBest.at
                 ))
             }
             if let repetitionBest = performances.max(by: {
-                ($0.2, $0.1, $0.3) < ($1.2, $1.1, $1.3)
-            }), repetitionBest.2 > 0 {
+                ($0.repetitions, $0.weightKg, $0.at) < ($1.repetitions, $1.weightKg, $1.at)
+            }), repetitionBest.repetitions > 0 {
                 candidates.append(MilestoneCandidate(
                     kind: exerciseRepetitionBestKind,
-                    threshold: Double(repetitionBest.2),
+                    threshold: Double(repetitionBest.repetitions),
                     relatedEntityID: prescriptionID,
-                    earnedAt: repetitionBest.3
+                    earnedAt: repetitionBest.at
                 ))
             }
         }

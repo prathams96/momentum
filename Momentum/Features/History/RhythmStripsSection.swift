@@ -13,6 +13,25 @@ struct CategoryRhythmModel: Identifiable {
     /// nil when the module has no streak semantics.
     let streak: Int?
     let pausedDays: Set<DomainDay>
+    /// True while the module's disabled interval covers the current day; the
+    /// row then reads "Paused" instead of a streak number (spec §3).
+    let isPausedToday: Bool
+
+    init(
+        metadata: ModuleMetadata,
+        category: HistoryCategory,
+        score: @escaping (DomainDay) -> DailyAdherenceScore,
+        streak: Int?,
+        pausedDays: Set<DomainDay>,
+        currentDay: DomainDay
+    ) {
+        self.metadata = metadata
+        self.category = category
+        self.score = score
+        self.streak = streak
+        self.pausedDays = pausedDays
+        self.isPausedToday = pausedDays.contains(currentDay)
+    }
 
     var id: ModuleID { metadata.id }
 
@@ -56,7 +75,8 @@ struct RhythmStripsSection: View {
                         through: currentDay,
                         calendar: calendar,
                         in: modelContext
-                    )
+                    ),
+                    currentDay: currentDay
                 )
             }
     }
@@ -111,7 +131,9 @@ struct CategoryRhythmStripRow: View {
         }
 
         var parts: [String] = []
-        if let streak = model.streak {
+        if model.isPausedToday {
+            parts.append("Streak paused, not broken")
+        } else if let streak = model.streak {
             parts.append("\(streak) \(streak == 1 ? "day" : "days") streak")
         }
         let percentages = days.map { model.presentation(for: $0) }
@@ -131,7 +153,11 @@ struct CategoryRhythmStripRow: View {
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 Spacer(minLength: MomentumSpacing.sm)
-                if let streak = model.streak {
+                if model.isPausedToday {
+                    Text("Paused")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                } else if let streak = model.streak {
                     Text("\(streak)")
                         .font(.title3.weight(.semibold).monospacedDigit())
                     Text(streak == 1 ? "day" : "days")
@@ -168,12 +194,22 @@ struct CategoryRhythmDrillDownView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: MomentumSpacing.lg) {
-                if let streak = model.streak {
+                if model.isPausedToday {
+                    VStack(alignment: .leading, spacing: MomentumSpacing.xxs) {
+                        Text("Paused")
+                            .font(.largeTitle.weight(.bold))
+                            .foregroundStyle(.secondary)
+                        Text("Streak paused, not broken")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                } else if let streak = model.streak {
                     VStack(alignment: .leading, spacing: MomentumSpacing.xxs) {
                         Text("\(streak)")
                             .font(.largeTitle.weight(.bold).monospacedDigit())
                             .foregroundStyle(MomentumTheme.pulseDeep)
-                        Text(streak == 1 ? "day streak" : "day streak")
+                        Text("day streak")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

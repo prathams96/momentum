@@ -61,4 +61,43 @@ final class RhythmCellPresentationTests: XCTestCase {
             scored(0).accessibilityLabel(for: day).contains("percent")
         )
     }
+
+    @MainActor
+    func testStripModelReadsPausedInsteadOfNumberWhileIntervalIsOpen() {
+        let today = DomainDay(year: 2026, month: 8, day: 25)
+
+        let paused = CategoryRhythmModel(
+            metadata: ModuleMetadata(
+                id: BuiltInModuleID.workout,
+                displayName: "Workout",
+                symbolName: "figure.strengthtraining.traditional",
+                tint: .red,
+                todayRank: 10
+            ),
+            category: .workouts,
+            score: { _ in .score(completedCount: 1, dueCount: 1, percentage: 100) },
+            streak: 4,
+            pausedDays: [today.adding(days: -1, calendar: Calendar(identifier: .gregorian)), today],
+            currentDay: today
+        )
+
+        XCTAssertTrue(paused.isPausedToday)
+
+        let active = CategoryRhythmModel(
+            metadata: ModuleMetadata(
+                id: BuiltInModuleID.workout,
+                displayName: "Workout",
+                symbolName: "figure.strengthtraining.traditional",
+                tint: .red,
+                todayRank: 10
+            ),
+            category: .workouts,
+            score: { _ in .score(completedCount: 1, dueCount: 1, percentage: 100) },
+            streak: 4,
+            pausedDays: [today.adding(days: -2, calendar: Calendar(identifier: .gregorian))],
+            currentDay: today
+        )
+
+        XCTAssertFalse(active.isPausedToday)
+    }
 }

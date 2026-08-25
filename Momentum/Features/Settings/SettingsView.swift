@@ -196,7 +196,7 @@ struct SettingsView: View {
         } header: {
             Text("Modules")
         } footer: {
-            Text("With a module off, its surfaces are hidden and its reminders are cancelled. History stays readable and your data is retained. Its streak pauses—never breaks—and resumes the day after you turn it back on.")
+            Text("With a module off, its surfaces are hidden. Its reminders are cancelled. History stays readable and its data is retained. Its streak pauses—never breaks—and resumes the day after you turn it back on.")
         }
     }
 

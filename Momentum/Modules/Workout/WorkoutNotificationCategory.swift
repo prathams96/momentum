@@ -13,10 +13,7 @@ extension WorkoutModuleAdapter: NotificationCategoryProviding {
                     title: "Start workout",
                     options: [.foreground]
                 ),
-                UNNotificationAction(
-                    identifier: MomentumNotificationAction.remindInThirtyMinutes,
-                    title: "Remind in 30 minutes"
-                ),
+                NotificationScheduler.remindInThirtyMinutesAction(),
                 UNNotificationAction(
                     identifier: MomentumNotificationAction.skipToday,
                     title: "Skip today"

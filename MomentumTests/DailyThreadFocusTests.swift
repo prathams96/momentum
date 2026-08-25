@@ -71,10 +71,7 @@ final class DailyThreadFocusTests: XCTestCase {
             contribution(id: "Workout", rank: 10, state: .attention),
             contribution(id: "Nutrition", rank: 20, state: .ongoing),
         ]
-        let callout = DailyThreadFocus.callout(
-            contributions: contributions,
-            stages: DailyThreadFocus.stages(from: contributions)
-        )
+        let callout = DailyThreadFocus.callout(contributions: contributions)
 
         XCTAssertEqual(callout, "Workout needs attention")
     }
@@ -84,10 +81,7 @@ final class DailyThreadFocusTests: XCTestCase {
             contribution(id: "Workout", rank: 10, state: .completed),
             contribution(id: "Nutrition", rank: 20, state: .ongoing),
         ]
-        let callout = DailyThreadFocus.callout(
-            contributions: contributions,
-            stages: DailyThreadFocus.stages(from: contributions)
-        )
+        let callout = DailyThreadFocus.callout(contributions: contributions)
 
         XCTAssertEqual(callout, "Nutrition next")
     }
@@ -97,10 +91,7 @@ final class DailyThreadFocusTests: XCTestCase {
             contribution(id: "Workout", rank: 10, state: .completed),
             contribution(id: "Care", rank: 20, state: .optional),
         ]
-        let callout = DailyThreadFocus.callout(
-            contributions: contributions,
-            stages: DailyThreadFocus.stages(from: contributions)
-        )
+        let callout = DailyThreadFocus.callout(contributions: contributions)
 
         XCTAssertEqual(callout, "All done for today")
     }
