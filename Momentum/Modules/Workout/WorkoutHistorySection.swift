@@ -35,6 +35,15 @@ extension WorkoutModuleAdapter: HistoryContributing {
             )
         )
     }
+
+    func adherenceActivities(on day: DomainDay, facts: [HistoryAdherenceFact]) -> [DueAdherenceActivity] {
+        let matching = facts.filter { $0.day == day && $0.category == .workouts }
+        guard !matching.isEmpty else { return [] }
+        return [DueAdherenceActivity(
+            kind: .workout,
+            isCompleted: matching.contains(where: \.isCompleted)
+        )]
+    }
 }
 
 /// The workout module's contribution to one recorded history day.

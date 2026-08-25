@@ -260,4 +260,13 @@ extension HydrationModuleAdapter: HistoryContributing {
             .map { HydrationAdherenceDay(day: $0, isTargetReached: false, isPaused: true) }
         return engine.hydrationStreak(days: adherenceDays, calendar: context.calendar)
     }
+
+    func adherenceActivities(on day: DomainDay, facts: [HistoryAdherenceFact]) -> [DueAdherenceActivity] {
+        let matching = facts.filter { $0.day == day && $0.category == .hydration }
+        guard !matching.isEmpty else { return [] }
+        return [DueAdherenceActivity(
+            kind: .hydration,
+            isCompleted: matching.contains(where: \.isCompleted)
+        )]
+    }
 }

@@ -466,7 +466,7 @@ struct OnboardingView: View {
             notificationStatus = .authorized
             return
         }
-        await notificationScheduler.configureCategories()
+        NotificationScheduler.registerCategories()
         notificationStatus = await notificationScheduler.authorizationStatus()
     }
 

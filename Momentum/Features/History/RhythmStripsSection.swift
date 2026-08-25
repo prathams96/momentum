@@ -3,27 +3,25 @@ import SwiftData
 import SwiftUI
 
 /// One category's model behind a rhythm strip row. Registry-driven: a fifth
-/// module adds a row, not a screen (pre-launch spec §3).
+/// module adds a row, not a screen (pre-launch spec §3). Scoring folds the
+/// module's own facts through its own adherence rule.
 struct CategoryRhythmModel: Identifiable {
     let metadata: ModuleMetadata
     let category: HistoryCategory
-    let facts: [HistoryAdherenceFact]
+    /// Score for one day, derived from the contributing module's fold rule.
+    let score: (DomainDay) -> DailyAdherenceScore
     /// nil when the module has no streak semantics.
     let streak: Int?
     let pausedDays: Set<DomainDay>
 
     var id: ModuleID { metadata.id }
 
-    func score(on day: DomainDay) -> DailyAdherenceScore {
-        HistoryProjection.adherenceScore(on: day, facts: facts, category: category)
-    }
-
     func isPaused(_ day: DomainDay) -> Bool {
         pausedDays.contains(day)
     }
 
     func presentation(for day: DomainDay) -> RhythmCellPresentation {
-        RhythmCellPresentation(score: score(on: day), isPaused: isPaused(day))
+        RhythmCellPresentation(score: score(day), isPaused: isPaused(day))
     }
 }
 
@@ -40,6 +38,7 @@ struct RhythmStripsSection: View {
 
     private var models: [CategoryRhythmModel] {
         let context = ModuleContext.make(in: modelContext, settings: settings, calendar: calendar)
+        let engine = AdherenceEngine()
         return ModuleRegistry.standard
             .enabledModules(ModuleEnablementStore.enabledIDs(from: settings))
             .compactMap { $0 as? any HistoryContributing }
@@ -48,7 +47,9 @@ struct RhythmStripsSection: View {
                 return CategoryRhythmModel(
                     metadata: contributor.metadata,
                     category: Self.category(for: contributor.metadata.id),
-                    facts: facts,
+                    score: { day in
+                        engine.dailyScore(activities: contributor.adherenceActivities(on: day, facts: facts))
+                    },
                     streak: contributor.categoryStreak(asOf: currentDay, in: context),
                     pausedDays: ModuleEnablementLedger.pausedDays(
                         for: contributor.metadata.id,
@@ -185,7 +186,7 @@ struct CategoryRhythmDrillDownView: View {
                     calendar: calendar,
                     pausedDays: model.pausedDays
                 ) { day in
-                    model.score(on: day)
+                    model.score(day)
                 }
             }
             .padding(.horizontal, MomentumSpacing.md)

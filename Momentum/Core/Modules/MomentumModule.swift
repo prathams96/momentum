@@ -2,6 +2,7 @@ import Foundation
 import MomentumCore
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 /// Semantic completion state of a module's Today obligation.
 enum ContributionState: Sendable, Equatable {
@@ -77,6 +78,9 @@ protocol HistoryContributing: MomentumModule {
     /// Consecutive eligible days with the category completed, ending at `day`.
     /// Returns nil when the module is disabled or has no streak semantics.
     func categoryStreak(asOf day: DomainDay, in context: ModuleContext) -> Int?
+    /// Folds this module's facts for one day into scored activities. Registry-
+    /// owned so shared scoring never hard-codes per-category rules.
+    func adherenceActivities(on day: DomainDay, facts: [HistoryAdherenceFact]) -> [DueAdherenceActivity]
 }
 
 /// Performs idempotent day-rollover reconciliation inside the module boundary.
@@ -92,6 +96,13 @@ protocol ReconcilingModule: MomentumModule {
 protocol ReminderCandidateProviding: MomentumModule {
     /// Identifier must be namespaced `<module>.<kind>...` and stable per opportunity.
     func reminderCandidates(in context: ModuleContext) -> [ScheduledReminder]
+}
+
+/// Declares the UNNotificationCategory its reminders use. Registration is
+/// registry-driven: Core never hard-codes a module's category.
+@MainActor
+protocol NotificationCategoryProviding: MomentumModule {
+    func notificationCategory() -> UNNotificationCategory
 }
 
 /// Supplies CSV export definitions; filenames of migrated modules are frozen.

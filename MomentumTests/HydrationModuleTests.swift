@@ -351,12 +351,10 @@ final class HydrationModuleTests: XCTestCase {
             XCTAssertEqual(module.categoryStreak(asOf: day, in: moduleContext), 0)
             XCTAssertEqual(module.categoryStreak(asOf: previous, in: moduleContext), 1)
 
-            // The hydration-category adherence score treats the day as one activity.
-            let score = HistoryProjection.adherenceScore(
-                on: previous,
-                facts: module.historyFacts(in: moduleContext),
-                category: .hydration
-            )
+            // The hydration module folds its day into one scored activity.
+            let activities = (module as? any HistoryContributing)?
+                .adherenceActivities(on: previous, facts: module.historyFacts(in: moduleContext)) ?? []
+            let score = AdherenceEngine().dailyScore(activities: activities)
             XCTAssertEqual(score, .score(completedCount: 1, dueCount: 1, percentage: 100))
         }
     }

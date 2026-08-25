@@ -52,67 +52,51 @@ actor NotificationScheduler {
         self.center = center
     }
 
-    func configureCategories() {
-        let remind = UNNotificationAction(
-            identifier: MomentumNotificationAction.remindInThirtyMinutes,
-            title: "Remind in 30 minutes"
-        )
-        let skip = UNNotificationAction(
-            identifier: MomentumNotificationAction.skipToday,
-            title: "Skip today"
-        )
-        let workout = UNNotificationCategory(
-            identifier: MomentumNotificationCategory.workoutDue,
-            actions: [
-                UNNotificationAction(
-                    identifier: MomentumNotificationAction.startWorkout,
-                    title: "Start workout",
-                    options: [.foreground]
-                ),
-                remind,
-                skip
-            ],
-            intentIdentifiers: []
-        )
-        let care = UNNotificationCategory(
-            identifier: MomentumNotificationCategory.careDue,
-            actions: [
-                UNNotificationAction(
-                    identifier: MomentumNotificationAction.markCareDone,
-                    title: "Done"
-                ),
-                remind,
-                skip
-            ],
-            intentIdentifiers: []
-        )
-        let evening = UNNotificationCategory(
-            identifier: MomentumNotificationCategory.eveningCheckIn,
-            actions: [
-                UNNotificationAction(
-                    identifier: MomentumNotificationAction.openToday,
-                    title: "Open Today",
-                    options: [.foreground]
-                ),
-                remind
-            ],
-            intentIdentifiers: []
-        )
+    /// Registers the Core-owned evening check-in category plus every module-
+    /// contributed category. Modules declare their own categories through
+    /// `NotificationCategoryProviding`; adding a module never edits this file.
+    static func coreCategories() -> [UNNotificationCategory] {
+        [
+            UNNotificationCategory(
+                identifier: MomentumNotificationCategory.eveningCheckIn,
+                actions: [
+                    UNNotificationAction(
+                        identifier: MomentumNotificationAction.openToday,
+                        title: "Open Today",
+                        options: [.foreground]
+                    ),
+                    UNNotificationAction(
+                        identifier: MomentumNotificationAction.remindInThirtyMinutes,
+                        title: "Remind in 30 minutes"
+                    ),
+                ],
+                intentIdentifiers: []
+            )
+        ]
+    }
 
-        let hydration = UNNotificationCategory(
-            identifier: MomentumNotificationCategory.hydrationCheckIn,
-            actions: [
-                UNNotificationAction(
-                    identifier: MomentumNotificationAction.openToday,
-                    title: "Open Momentum",
-                    options: [.foreground]
-                ),
-                remind
-            ],
-            intentIdentifiers: []
-        )
+    @MainActor
+    static func registeredCategories(registry: ModuleRegistry = .standard) -> [UNNotificationCategory] {
+        let moduleCategories = registry.modules
+            .compactMap { $0 as? any NotificationCategoryProviding }
+            .map { $0.notificationCategory() }
+        return coreCategories() + moduleCategories
+    }
 
-        center.setNotificationCategories([workout, care, evening, hydration])
+    /// Registers the Core-owned evening check-in category plus every module-
+    /// contributed category. Modules declare their own categories through
+    /// `NotificationCategoryProviding`; adding a module never edits this file.
+    /// MainActor-bound because category construction touches the registry and
+    /// keeps non-Sendable values off other executors.
+    @MainActor
+    static func registerCategories(
+        center: UNUserNotificationCenter = .current(),
+        registry: ModuleRegistry = .standard
+    ) {
+        let moduleCategories = registry.modules
+            .compactMap { $0 as? any NotificationCategoryProviding }
+            .map { $0.notificationCategory() }
+        center.setNotificationCategories(Set(coreCategories() + moduleCategories))
     }
 
     func requestAuthorization() async throws -> Bool {
