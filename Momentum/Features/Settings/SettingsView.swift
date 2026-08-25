@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var notificationStatus = SettingsNotificationStatus.checking
     @State private var exportFiles: [CSVExportFile] = []
     @State private var isPreparingExport = false
+    @State private var isRestoringExamplePlan = false
     @State private var presentedAlert: SettingsAlert?
     @State private var presentedSheet: SettingsSheet?
 
@@ -286,13 +287,47 @@ struct SettingsView: View {
 
     private var resetSection: some View {
         Section {
+            Button {
+                Task { await restoreExamplePlan() }
+            } label: {
+                HStack {
+                    Label("Install example plan", systemImage: "sparkles")
+                    Spacer()
+                    if isRestoringExamplePlan {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(isRestoringExamplePlan)
+
             Button("Reset all data", role: .destructive) {
                 presentedSheet = .resetAllData
             }
         } header: {
             Text("Data management")
         } footer: {
-            Text("Reset deletes plans, history, food, care, measurements, milestones, and settings. The deletion can synchronize through iCloud.")
+            Text("The example plan installs the built-in Upper/Lower workout templates and personal care routines, and enables their modules. Reset deletes plans, history, food, care, measurements, milestones, and settings. The deletion can synchronize through iCloud.")
+        }
+    }
+
+    private func restoreExamplePlan() async {
+        isRestoringExamplePlan = true
+        defer { isRestoringExamplePlan = false }
+        do {
+            try SeedData.install(in: modelContext)
+            if let settings {
+                var ids = ModuleEnablementStore.enabledIDs(from: settings)
+                ids.formUnion(ModuleRegistry.defaultEnabledIDs)
+                ModuleEnablementStore.apply(ids, to: settings)
+            }
+            try modelContext.save()
+            draft = SettingsDraft(
+                settings: AppSettingsRecord.canonical(in: settingsRecords) ?? AppSettingsRecord(),
+                routines: activeRoutines
+            )
+            savedDraft = draft
+        } catch {
+            presentedAlert = .saveFailed
         }
     }
 
@@ -569,7 +604,9 @@ private struct ResetAllDataSheet: View {
         errorMessage = nil
         do {
             try ResetAllDataService.reset(context: modelContext)
-            try SeedData.install(in: modelContext)
+            // Empty by default: a reset returns to the empty app, not the
+            // example plan. The example plan comes back only on request.
+            try SeedData.ensureSettingsRecord(in: modelContext)
             await NotificationScheduler().cancelAllMomentumReminders()
             dismiss()
         } catch {

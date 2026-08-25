@@ -7,12 +7,18 @@ final class MomentumUITests: XCTestCase {
         app.launchArguments = ["-usePreviewStore"]
         app.launch()
 
-        let planButton = app.buttons["See the plan"]
-        XCTAssertTrue(planButton.waitForExistence(timeout: 5))
-        planButton.tap()
+        let getStarted = app.buttons["Get started"]
+        XCTAssertTrue(getStarted.waitForExistence(timeout: 5))
+        getStarted.tap()
+
+        let examplePlan = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Start from the example plan")
+        ).firstMatch
+        XCTAssertTrue(examplePlan.waitForExistence(timeout: 5))
+        examplePlan.tap()
 
         let nextButton = app.buttons["Keep Upper A next"]
-        XCTAssertTrue(nextButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(nextButton.waitForExistence(timeout: 10))
         nextButton.tap()
 
         let startButton = app.buttons["Start with Upper A"]

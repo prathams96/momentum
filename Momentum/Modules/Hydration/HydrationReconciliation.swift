@@ -14,7 +14,7 @@ enum HydrationReconciliationEngine {
         in context: ModuleContext
     ) throws {
         let modelContext = context.modelContext
-        let plan = HydrationPlanService.fetchOrCreate(in: modelContext, now: context.now)
+        let plan = HydrationPlanService.fetchOrCreate(in: modelContext, now: context.now, unitSystemRaw: context.unitSystemRaw)
         let dayKey = PersistedDomainDay.encode(currentDay)
         let dayRecords = (try? modelContext.fetch(FetchDescriptor<HydrationDayRecord>())) ?? []
 

@@ -5,6 +5,23 @@ import SwiftData
 enum SeedData {
     static let currentVersion = 4
 
+    /// Empty-by-default (pre-launch spec §4): new installs get only a
+    /// canonical settings record — never example content. Example content
+    /// installs solely through explicit paths: the onboarding choice,
+    /// Settings' restore action, and dev restore.
+    static func ensureSettingsRecord(in context: ModelContext) throws {
+        let settingsRecords = try context.fetch(FetchDescriptor<AppSettingsRecord>())
+        let settings = AppSettingsRecord.canonical(in: settingsRecords)
+        for duplicate in settingsRecords where duplicate.id != settings?.id {
+            context.delete(duplicate)
+        }
+        if settings == nil {
+            context.insert(AppSettingsRecord())
+        }
+        try context.save()
+    }
+
+    /// Installs the example plan behind an explicit opt-in. Idempotent.
     static func install(
         in context: ModelContext,
         currentDomainDay: DomainDay = DomainDay.containing(

@@ -25,25 +25,32 @@ struct TodayView: View {
 
     var body: some View {
         let context = ModuleContext.make(in: modelContext, settings: canonicalSettings)
+        let enabledIDs = ModuleEnablementStore.enabledIDs(from: canonicalSettings)
         let contributors = ModuleRegistry.standard
-            .enabledModules(ModuleEnablementStore.enabledIDs(from: canonicalSettings))
+            .enabledModules(enabledIDs)
             .compactMap { $0 as? any TodayContributing }
         let contributions = contributors.compactMap { $0.todayContribution(in: context) }
         let sections = contributors.compactMap { $0.todaySection(in: context) }
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: MomentumSpacing.xl) {
-                dateLine(contributions)
-                ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
-                    section
+        Group {
+            if enabledIDs.isEmpty {
+                allModulesOffState
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: MomentumSpacing.xl) {
+                        dateLine(contributions)
+                        ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                            section
+                        }
+                        consistencySection
+                    }
+                    .padding(.horizontal, MomentumSpacing.md)
+                    .padding(.top, MomentumSpacing.xs)
+                    .padding(.bottom, 96)
                 }
-                consistencySection
+                .background(Color(uiColor: .systemBackground))
             }
-            .padding(.horizontal, MomentumSpacing.md)
-            .padding(.top, MomentumSpacing.xs)
-            .padding(.bottom, 96)
         }
-        .background(Color(uiColor: .systemBackground))
         .navigationTitle("Today")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
@@ -92,6 +99,23 @@ struct TodayView: View {
 
     private func dailyThreadCallout(contributions: [TodayContribution], stages: [DailyThreadStageModel]) -> String {
         DailyThreadFocus.callout(contributions: contributions, stages: stages)
+    }
+
+    /// The app-level empty state (pre-launch spec §4): one quiet line with a
+    /// Settings link — not a set of per-module placeholders.
+    private var allModulesOffState: some View {
+        VStack(spacing: MomentumSpacing.md) {
+            Text("Nothing is being tracked yet.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+            NavigationLink {
+                SettingsView()
+            } label: {
+                Label("Open Settings", systemImage: "gearshape")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(MomentumSpacing.lg)
     }
 
     // MARK: - Consistency
