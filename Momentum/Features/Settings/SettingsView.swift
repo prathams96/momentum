@@ -277,7 +277,7 @@ struct SettingsView: View {
                 Label("Data storage", systemImage: "hand.raised.fill")
                     .font(.headline)
                     .foregroundStyle(.primary)
-                Text("Momentum stores workout, nutrition, care, and measurement data on this device and in your private iCloud database when available.")
+                Text("Momentum stores workout, nutrition, personal care, and measurement data on this device and in your private iCloud database when available.")
                 Text("There are no accounts, ads, analytics, or third-party data services.")
             }
             .foregroundStyle(.secondary)

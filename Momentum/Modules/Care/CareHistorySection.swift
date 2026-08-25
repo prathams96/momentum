@@ -59,9 +59,9 @@ struct CareHistoryDaySection: View {
     }
 
     var body: some View {
-        Section("Care") {
+        Section("Personal care") {
             if dayCare.isEmpty {
-                Text("No care routines due")
+                Text("No personal care routines due")
                     .foregroundStyle(.secondary)
             }
             ForEach(dayCare) { occurrence in

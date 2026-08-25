@@ -157,7 +157,7 @@ struct HistoryView: View {
             Text(deletion.message)
         }
         .confirmationDialog(
-            "Undo care completion?",
+            "Undo personal care completion?",
             isPresented: Binding(
                 get: { pendingCareUndo != nil },
                 set: { if !$0 { pendingCareUndo = nil } }
@@ -250,7 +250,7 @@ struct HistoryView: View {
             pendingCareUndo = nil
             reconcileHistory()
         } catch {
-            correctionError = "Care completion could not be undone. No partial correction was kept."
+            correctionError = "Personal care completion could not be undone. No partial correction was kept."
         }
     }
 

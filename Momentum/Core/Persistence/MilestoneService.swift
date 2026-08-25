@@ -133,7 +133,7 @@ enum MilestoneService {
             )
         case careStreakKind:
             return MilestonePresentation(
-                title: "Care consistency",
+                title: "Personal care consistency",
                 message: "All due personal care was completed for a record \(count) consecutive Domain Days.",
                 symbol: "sparkles"
             )

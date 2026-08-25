@@ -34,7 +34,7 @@ final class NutritionModuleAdapter: MomentumModule {
 final class CareModuleAdapter: MomentumModule {
     let metadata = ModuleMetadata(
         id: BuiltInModuleID.care,
-        displayName: "Care",
+        displayName: "Personal care",
         symbolName: "sparkles",
         tint: MomentumTheme.dataCyan,
         todayRank: 30

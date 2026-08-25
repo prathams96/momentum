@@ -31,7 +31,7 @@ struct CarePlanSection: View {
                 }
             }
         } header: {
-            Text("Care routines")
+            Text("Personal care routines")
         } footer: {
             Text("Edit future recurrence, task order, instructions, ingredients, and reminder times. Logged occurrences keep their snapshots.")
         }
@@ -103,7 +103,7 @@ struct CarePlanEditor: View {
                 Button("Add task", systemImage: "plus") { taskEditor = .new(routineID) }
             }
         }
-        .navigationTitle(routine?.name ?? "Care routine")
+        .navigationTitle(routine?.name ?? "Personal care routine")
         .toolbar { EditButton() }
         .onAppear(perform: load)
         .sheet(item: $taskEditor) { destination in CareTaskPlanEditor(destination: destination) }
