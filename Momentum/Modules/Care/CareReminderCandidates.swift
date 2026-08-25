@@ -15,7 +15,7 @@ extension CareModuleAdapter: ReminderCandidateProviding {
                 ScheduledReminder(
                     identifier: "care.due.\(occurrence.id.uuidString)",
                     title: occurrence.routineNameSnapshot,
-                    body: "Your care routine is ready.",
+                    body: "Complete \(occurrence.routineNameSnapshot).",
                     categoryIdentifier: MomentumNotificationCategory.careDue,
                     dateComponents: context.calendar.dateComponents(
                         [.year, .month, .day, .hour, .minute],
@@ -23,7 +23,6 @@ extension CareModuleAdapter: ReminderCandidateProviding {
                     ),
                     userInfo: [
                         "kind": "careDue",
-                        "actionKind": "careDue",
                         "occurrenceID": occurrence.id.uuidString,
                         "domainDay": occurrence.dueDomainDay
                     ]
