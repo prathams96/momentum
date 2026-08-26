@@ -68,6 +68,40 @@ final class EveningMergeFallbackTests: XCTestCase {
         XCTAssertEqual(result.first?.identifier, "care.due.morning")
     }
 
+    func testChainedCandidatesBeyondTheAnchorWindowStillMerge() {
+        let day = DomainDay(year: 2026, month: 8, day: 25)
+        // 21:30 sits inside the anchor's ±30 window; 21:00 is 60 minutes from
+        // the anchor but only 30 from 21:30 — the chain must absorb it so no
+        // second evening reminder can fire.
+        let nearAnchor = ScheduledReminder(
+            identifier: "care.due.near",
+            title: "Night care",
+            body: "Complete Night care.",
+            categoryIdentifier: MomentumNotificationCategory.careDue,
+            dateComponents: components(day, hour: 21, minute: 30),
+            userInfo: [:]
+        )
+        let chained = ScheduledReminder(
+            identifier: "care.due.chained",
+            title: "Hair care",
+            body: "Complete Hair care.",
+            categoryIdentifier: MomentumNotificationCategory.careDue,
+            dateComponents: components(day, hour: 21),
+            userInfo: [:]
+        )
+
+        let merged = ReminderBundler.bundle(
+            [nearAnchor, chained],
+            anchorCategory: MomentumNotificationCategory.eveningCheckIn,
+            fallbackAnchorDateComponents: components(day, hour: 22)
+        )
+
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged.first?.categoryIdentifier, MomentumNotificationCategory.eveningCheckIn)
+        XCTAssertEqual(merged.first?.dateComponents.hour, 21)
+        XCTAssertEqual(merged.first?.body, "Complete Night care. Complete Hair care.")
+    }
+
     func testModuleSetupLazilyCreatesDefaultsForLaterEnabledModules() throws {
         let container = try ModelContainerFactory.makePreview()
         let context = container.mainContext

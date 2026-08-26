@@ -15,52 +15,65 @@ enum ReminderBundler {
         proximityMinutes: Int = 30,
         fallbackAnchorDateComponents: DateComponents? = nil
     ) -> [ScheduledReminder] {
-        let anchors = candidates.filter { $0.categoryIdentifier == anchorCategory }
+        var anchors = candidates.filter { $0.categoryIdentifier == anchorCategory }
 
         // One-notification-max guarantee (spec §6): when no module supplied
         // an anchor (e.g. nutrition disabled or already finalized), Core's
         // fallback time seeds a synthetic Evening check-in so nearby
         // candidates still merge instead of firing individually.
         if anchors.isEmpty, let fallback = fallbackAnchorDateComponents {
-            let nearby = candidates.filter {
+            let seeded = candidates.filter {
                 firesWithin($0.dateComponents, of: fallback, minutes: proximityMinutes)
             }
-            guard !nearby.isEmpty else { return candidates }
-            let anchor = ScheduledReminder(
+            guard !seeded.isEmpty else { return candidates }
+            let earliest = seeded.map(\.dateComponents).reduce(fallback) {
+                minuteOfDay($0) <= minuteOfDay($1) ? $0 : $1
+            }
+            anchors = [ScheduledReminder(
                 identifier: "evening.checkin.merged",
                 title: "Evening check-in",
                 body: "",
                 categoryIdentifier: anchorCategory,
-                dateComponents: nearby.map(\.dateComponents).reduce(fallback) {
-                    minuteOfDay($0) <= minuteOfDay($1) ? $0 : $1
-                },
+                dateComponents: earliest,
                 userInfo: [:]
-            )
-            return [merge(nearby, into: anchor)]
-                + candidates.filter { !Set(nearby).contains($0) }
+            )]
         }
 
-        guard !anchors.isEmpty else { return candidates }
+        guard let primary = anchors.first else { return candidates }
 
-        var mergedByAnchor: [String: (anchor: ScheduledReminder, merged: [ScheduledReminder])] = [:]
-        var mergedIdentifiers = Set<String>()
-        for anchor in anchors {
-            let nearby = candidates.filter { candidate in
-                candidate.identifier != anchor.identifier
-                    && candidate.categoryIdentifier != anchorCategory
-                    && firesWithin(candidate.dateComponents, of: anchor.dateComponents, minutes: proximityMinutes)
+        // Transitive clustering: absorb any candidate within the proximity
+        // window of an already-clustered candidate, so chained reminders
+        // collapse into the single Evening check-in instead of firing
+        // separately. Candidates far outside every cluster (e.g. a daytime
+        // workout reminder) keep their own actionable notification.
+        var clustered = Set([primary.identifier])
+        var clusterTimes = [primary.dateComponents]
+        var changed = true
+        while changed {
+            changed = false
+            for candidate in candidates where !clustered.contains(candidate.identifier) {
+                if clusterTimes.contains(where: {
+                    firesWithin(candidate.dateComponents, of: $0, minutes: proximityMinutes)
+                }) {
+                    clustered.insert(candidate.identifier)
+                    clusterTimes.append(candidate.dateComponents)
+                    changed = true
+                }
             }
-            if !nearby.isEmpty {
-                mergedByAnchor[anchor.identifier] = (anchor, nearby)
-                mergedIdentifiers.formUnion(nearby.map(\.identifier))
-            }
         }
 
-        return candidates.compactMap { candidate in
-            if mergedIdentifiers.contains(candidate.identifier) { return nil }
-            guard let entry = mergedByAnchor[candidate.identifier] else { return candidate }
-            return merge(entry.merged, into: entry.anchor)
+        let folded = candidates.filter {
+            clustered.contains($0.identifier) && $0.identifier != primary.identifier
         }
+        guard !folded.isEmpty else {
+            // Nothing folded (a synthesized anchor always folds its seeds, so
+            // this can only happen for a real anchor with no neighbours).
+            return candidates
+        }
+
+        var result = candidates.filter { !clustered.contains($0.identifier) }
+        result.append(merge(folded, into: primary))
+        return result
     }
 
     private static func firesWithin(

@@ -179,7 +179,7 @@ private struct HydrationHistoryEditSheet: View {
         // The field displays the entry in the active unit system; storage
         // stays millilitre-canonical either way.
         amount = unitSystem == .imperial
-            ? Double(HydrationEngine.fluidOunces(fromML: entry.amountML))
+            ? HydrationEngine.exactFluidOunces(fromML: entry.amountML)
             : Double(entry.amountML)
         consumedAt = entry.consumedAt
     }
@@ -190,7 +190,7 @@ private struct HydrationHistoryEditSheet: View {
         case .metric:
             amountML = Int(amount.rounded())
         case .imperial:
-            amountML = HydrationEngine.millilitres(fromFluidOunces: Int(amount.rounded()))
+            amountML = HydrationEngine.millilitres(fromExactFluidOunces: amount)
         }
         guard amountML > 0 else {
             saveError = "Enter an amount greater than zero."

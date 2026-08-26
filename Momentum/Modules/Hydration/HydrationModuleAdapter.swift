@@ -33,7 +33,7 @@ enum HydrationVolumeFormatting {
     /// imperial locales. Storage stays millilitre-canonical either way.
     static func volume(_ millilitres: Int, unitSystem: UnitSystemOption) -> String {
         guard unitSystem == .imperial else { return volume(millilitres) }
-        return "\(HydrationEngine.fluidOunces(fromML: millilitres)) fl oz"
+        return "\(HydrationEngine.fluidOuncesDisplay(fromML: millilitres)) fl oz"
     }
 
     /// "1.6 L" for values of at least a litre, otherwise "750 ml".

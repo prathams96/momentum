@@ -720,12 +720,14 @@ struct OnboardingView: View {
         // CONTEXT.md module inference (pre-launch spec §4): hydration is
         // always on; workout follows a confirmed cycle starting point;
         // nutrition follows an accepted target; care follows the example
-        // plan or kept care reminder times (e.g. synced routines). Skipped
-        // steps mean the module ships disabled.
+        // plan. Skipped steps mean the module ships disabled.
         var enabledIDs: Set<ModuleID> = [BuiltInModuleID.hydration]
         if selectedWorkoutID != nil { enabledIDs.insert(BuiltInModuleID.workout) }
         if trackNutrition { enabledIDs.insert(BuiltInModuleID.nutrition) }
-        if planChoice == .examplePlan || !routines.isEmpty {
+        // Spec §4: care is enabled only by the example plan or an explicitly
+        // kept/set reminder time; the build-own path shows no care pickers,
+        // so it stays off there.
+        if planChoice == .examplePlan {
             enabledIDs.insert(BuiltInModuleID.care)
         }
         ModuleEnablementStore.apply(enabledIDs, to: settings)

@@ -14,6 +14,7 @@ struct HistoryView: View {
     @Query private var foodEntries: [FoodEntryRecord]
     @Query private var careOccurrences: [CareOccurrenceRecord]
     @Query private var measurements: [BodyMeasurementRecord]
+    @Query private var hydrationEntries: [HydrationEntryRecord]
 
     @State private var presentedSheet: HistorySheetDestination?
     @State private var pendingDeletion: HistoryDeletionRequest?
@@ -48,6 +49,16 @@ struct HistoryView: View {
 
     private var enabledIDs: Set<ModuleID> {
         ModuleEnablementStore.enabledIDs(from: canonicalSettings)
+    }
+
+    private func hydrationSummary(for day: DomainDay) -> String? {
+        guard enabledIDs.contains(BuiltInModuleID.hydration) else { return nil }
+        let entries = HydrationRecords.activeEntries(for: PersistedDomainDay.encode(day), in: hydrationEntries)
+        guard !entries.isEmpty else { return nil }
+        let unitSystem = UnitSystemOption(
+            rawValue: canonicalSettings?.unitSystemRaw ?? "metric"
+        ) ?? .metric
+        return "\(HydrationVolumeFormatting.volume(HydrationRecords.total(intake: entries), unitSystem: unitSystem)) water"
     }
 
     private var filteredDays: [DomainDay] {
@@ -92,6 +103,7 @@ struct HistoryView: View {
                             HistoryDayRow(
                                 day: day,
                                 enabledIDs: enabledIDs,
+                                hydrationSummary: hydrationSummary(for: day),
                                 sessions: sessions,
                                 workoutEvents: workoutEvents,
                                 nutritionDays: nutritionDays,

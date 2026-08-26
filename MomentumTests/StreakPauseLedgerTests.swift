@@ -90,7 +90,7 @@ final class StreakPauseLedgerTests: XCTestCase {
         }
     }
 
-    func testReEnablingAnchorsTheNewIntervalToTheActualDay() throws {
+    func testReEnablingResumesTheDayAfterTheToggle() throws {
         try withStore { context in
             var withoutCare = ModuleRegistry.defaultEnabledIDs
             withoutCare.remove(BuiltInModuleID.care)
@@ -106,7 +106,9 @@ final class StreakPauseLedgerTests: XCTestCase {
                 calendar: calendar,
                 in: context
             )
-            XCTAssertEqual(paused, Set((4...8).map { day(2026, 8, $0) }))
+            // Re-enabled Aug 9 → the toggle day itself stays paused; the
+            // streak resumes Aug 10 (spec §2: resumes the day after re-enable).
+            XCTAssertEqual(paused, Set((4...9).map { day(2026, 8, $0) }))
         }
     }
 

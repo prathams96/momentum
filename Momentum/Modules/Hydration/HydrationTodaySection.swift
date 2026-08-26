@@ -151,12 +151,12 @@ struct HydrationTodaySection: View {
 
     private func presetLabel(_ amountML: Int) -> String {
         guard unitSystem == .imperial else { return "\(amountML) ml" }
-        return "\(HydrationEngine.fluidOunces(fromML: amountML)) fl oz"
+        return "\(HydrationEngine.fluidOuncesDisplay(fromML: amountML)) fl oz"
     }
 
     private func presetAccessibilityLabel(_ amountML: Int) -> String {
         guard unitSystem == .imperial else { return "Add \(amountML) millilitres" }
-        return "Add \(HydrationEngine.fluidOunces(fromML: amountML)) fluid ounces"
+        return "Add \(HydrationEngine.fluidOuncesDisplay(fromML: amountML)) fluid ounces"
     }
 
     private func fillWidth(in width: CGFloat) -> CGFloat {
@@ -251,7 +251,7 @@ struct HydrationCustomAmountSheet: View {
         case .metric:
             amountML = Int(amount.rounded())
         case .imperial:
-            amountML = HydrationEngine.millilitres(fromFluidOunces: Int(amount.rounded()))
+            amountML = HydrationEngine.millilitres(fromExactFluidOunces: amount)
         }
         guard amountML > 0 else {
             saveError = "Enter an amount greater than zero."

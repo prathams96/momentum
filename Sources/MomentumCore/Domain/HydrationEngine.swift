@@ -66,13 +66,37 @@ public enum HydrationEngine {
             .filter { isBehindPace(targetML: targetML, consumedML: consumedML, checkpointMinuteOfDay: $0) }
     }
 
-    /// Whole fluid ounces for imperial rendering (rounded).
+    /// Whole fluid ounces for imperial conversion (rounded). Storage and
+    /// round-trip conversion only — prefer `fluidOuncesDisplay` for rendering,
+    /// which avoids the whole-ounce rounding artifact (500 ml is 16.9 fl oz).
     public static func fluidOunces(fromML millilitres: Int) -> Int {
         Int((Double(millilitres) / 29.573_529_562_5).rounded())
+    }
+
+    /// Exact fluid ounces for editable fields, unrounded.
+    public static func exactFluidOunces(fromML millilitres: Int) -> Double {
+        Double(millilitres) / 29.573_529_562_5
+    }
+
+    /// Rendered fluid ounces: a whole number only when the value sits within
+    /// 0.05 fl oz of an integer, otherwise up to one decimal. Canonical ml
+    /// defaults (2 514 / 237 / 473 / 710) render as exact 85/8/16/24, while
+    /// metric-era values like 500 ml render as "16.9", never a false "17".
+    public static func fluidOuncesDisplay(fromML millilitres: Int) -> String {
+        let ounces = exactFluidOunces(fromML: millilitres)
+        if abs(ounces - ounces.rounded()) < 0.05 {
+            return String(Int(ounces.rounded()))
+        }
+        return ounces.formatted(.number.precision(.fractionLength(0...1)))
     }
 
     /// Millilitres converted from whole fluid ounces.
     public static func millilitres(fromFluidOunces ounces: Int) -> Int {
         Int((Double(ounces) * 29.573_529_562_5).rounded())
+    }
+
+    /// Millilitres converted from an exact fluid-ounce amount (editable fields).
+    public static func millilitres(fromExactFluidOunces ounces: Double) -> Int {
+        Int((ounces * 29.573_529_562_5).rounded())
     }
 }

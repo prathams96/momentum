@@ -157,7 +157,7 @@ struct HistoryHeatmapView: View {
                 VStack(spacing: cellSpacing) {
                     ForEach(weekdayLabels, id: \.self) { label in
                         Text(label)
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                             .frame(width: 18, height: cellSlot)
                             .accessibilityHidden(true)
@@ -190,7 +190,8 @@ struct HistoryHeatmapView: View {
     /// each grid slot is a larger uniform hit target so labels stay aligned.
     private let cellSize: CGFloat = 12
     private let cellSlot: CGFloat = 26
-    private var cellSpacing: CGFloat { 4 }
+    // DESIGN.md Heatmap Rule: 3-point gaps.
+    private var cellSpacing: CGFloat { 3 }
 
     private func dayCell(_ day: DomainDay) -> some View {
         let presentation = presentation(for: day)
@@ -266,6 +267,8 @@ struct HistoryDayRow: View {
     let day: DomainDay
     /// Only enabled modules' records may appear in the summary.
     let enabledIDs: Set<ModuleID>
+    /// Preformatted hydration total for the day, or nil.
+    var hydrationSummary: String? = nil
     let sessions: [WorkoutSessionRecord]
     let workoutEvents: [WorkoutDayEventRecord]
     let nutritionDays: [NutritionDayRecord]
@@ -299,6 +302,9 @@ struct HistoryDayRow: View {
         if enabledIDs.contains(BuiltInModuleID.care) {
             let care = careOccurrences.count { $0.dueDomainDay == dayKey }
             if care > 0 { values.append("\(care) personal care \(care == 1 ? "routine" : "routines")") }
+        }
+        if enabledIDs.contains(BuiltInModuleID.hydration), let hydrationSummary {
+            values.append(hydrationSummary)
         }
         return values
     }

@@ -48,10 +48,19 @@ final class EmptyByDefaultTests: XCTestCase {
 
         // Storage stays ml-canonical but renders as whole fl oz:
         // ≈85 fl oz target, 8/16/24 fl oz presets.
-        XCTAssertEqual(HydrationEngine.fluidOunces(fromML: imperialPlan.targetML), 85)
-        XCTAssertEqual(HydrationEngine.fluidOunces(fromML: imperialPlan.firstPresetML), 8)
-        XCTAssertEqual(HydrationEngine.fluidOunces(fromML: imperialPlan.secondPresetML), 16)
-        XCTAssertEqual(HydrationEngine.fluidOunces(fromML: imperialPlan.thirdPresetML), 24)
+        XCTAssertEqual(HydrationEngine.fluidOuncesDisplay(fromML: imperialPlan.targetML), "85")
+        XCTAssertEqual(HydrationEngine.fluidOuncesDisplay(fromML: imperialPlan.firstPresetML), "8")
+        XCTAssertEqual(HydrationEngine.fluidOuncesDisplay(fromML: imperialPlan.secondPresetML), "16")
+        XCTAssertEqual(HydrationEngine.fluidOuncesDisplay(fromML: imperialPlan.thirdPresetML), "24")
+
+        // Metric-era values keep honest fractional rendering: 500 ml is
+        // 16.9 fl oz, never a rounded-up false 17.
+        XCTAssertEqual(HydrationEngine.fluidOuncesDisplay(fromML: 500), "16.9")
+        XCTAssertEqual(HydrationEngine.exactFluidOunces(fromML: 500), 500.0 / 29.573_529_562_5, accuracy: 0.0001)
+        XCTAssertEqual(
+            HydrationEngine.millilitres(fromExactFluidOunces: HydrationEngine.exactFluidOunces(fromML: 500)),
+            500
+        )
 
         // Metric keeps its existing defaults.
         try context.delete(context.fetch(FetchDescriptor<HydrationPlanRecord>()).first!)
