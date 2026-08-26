@@ -696,6 +696,16 @@ struct OnboardingView: View {
             : nil
         let originalPriorTargetEnd = priorOpenTarget?.effectiveTo
         let target = existingTarget ?? NutritionTargetRecord(effectiveFrom: effectiveFrom)
+        // Snapshot for rollback when an existing target is edited in place.
+        let originalTargetValues = existingTarget.map {
+            (
+                display: $0.calorieDisplayTarget,
+                minimum: $0.calorieMinimum,
+                maximum: $0.calorieMaximum,
+                protein: $0.proteinMinimumGrams,
+                updatedAt: $0.updatedAt
+            )
+        }
         if trackNutrition, existingTarget == nil {
             modelContext.insert(target)
         }
@@ -759,6 +769,13 @@ struct OnboardingView: View {
             settings.enabledModulesRaw = originalSettings.enabledModulesRaw
             if trackNutrition, existingTarget == nil {
                 modelContext.delete(target)
+            }
+            if let originalTargetValues, let existingTarget {
+                existingTarget.calorieDisplayTarget = originalTargetValues.display
+                existingTarget.calorieMinimum = originalTargetValues.minimum
+                existingTarget.calorieMaximum = originalTargetValues.maximum
+                existingTarget.proteinMinimumGrams = originalTargetValues.protein
+                existingTarget.updatedAt = originalTargetValues.updatedAt
             }
             priorOpenTarget?.effectiveTo = originalPriorTargetEnd
             if let anchor, let originalAnchor {

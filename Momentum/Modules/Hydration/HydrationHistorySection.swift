@@ -176,7 +176,11 @@ private struct HydrationHistoryEditSheet: View {
     }
 
     private func load() {
-        amount = Double(entry.amountML)
+        // The field displays the entry in the active unit system; storage
+        // stays millilitre-canonical either way.
+        amount = unitSystem == .imperial
+            ? Double(HydrationEngine.fluidOunces(fromML: entry.amountML))
+            : Double(entry.amountML)
         consumedAt = entry.consumedAt
     }
 

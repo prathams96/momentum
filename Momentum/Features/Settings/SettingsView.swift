@@ -306,7 +306,7 @@ struct SettingsView: View {
         } header: {
             Text("Data management")
         } footer: {
-            Text("The example plan installs the built-in Upper/Lower workout templates and personal care routines, and enables their modules. Reset deletes plans, history, food, care, measurements, milestones, and settings. The deletion can synchronize through iCloud.")
+            Text("The example plan installs the built-in Upper/Lower workout templates and personal care routines, and enables their modules. Reset deletes plans, history, food, personal care records, measurements, milestones, and settings. The deletion can synchronize through iCloud.")
         }
     }
 
@@ -424,14 +424,13 @@ struct SettingsView: View {
     private func persistSettings() {
         guard let settings else { return }
         isSaving = true
-        let previousEnabledIDs = savedDraft?.enabledModuleIDs ?? draft.enabledModuleIDs
-        let newlyEnabled = draft.enabledModuleIDs.subtracting(previousEnabledIDs)
         draft.apply(to: settings, routines: activeRoutines)
         do {
             // Later-enabled modules get their defaults lazily (spec §4).
             try ModuleSetup.ensureDefaults(
-                for: newlyEnabled,
+                for: draft.enabledModuleIDs,
                 unitSystemRaw: settings.unitSystemRaw,
+                domainDayCutoffMinutes: settings.domainDayCutoffMinutes,
                 in: modelContext
             )
             try modelContext.save()
@@ -571,7 +570,7 @@ private struct ResetAllDataSheet: View {
                 Section {
                     Label("This cannot be undone", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
-                    Text("Plans, workout history, food logs, care history, measurements, milestones, and settings will be deleted.")
+                    Text("Plans, workout history, food logs, personal care history, measurements, milestones, and settings will be deleted.")
                 }
 
                 Section {

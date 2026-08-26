@@ -50,6 +50,26 @@ enum DailyReconciler {
             )
         }
 
+        // Lazy setup for enabled modules (spec §4 · Setup steps): runs on
+        // every reconciliation so a later-enabled module has its defaults by
+        // its first surface visit. Idempotent; errors are non-fatal.
+        if let settings {
+            do {
+                try ModuleSetup.ensureDefaults(
+                    for: enabledIDs,
+                    unitSystemRaw: settings.unitSystemRaw,
+                    domainDayCutoffMinutes: settings.domainDayCutoffMinutes,
+                    now: now,
+                    calendar: calendar,
+                    in: context
+                )
+            } catch {
+                logger.error(
+                    "Module setup failed: \(String(describing: error), privacy: .public)"
+                )
+            }
+        }
+
         let reconcilers = registry
             .enabledModules(enabledIDs)
             .compactMap { $0 as? any ReconcilingModule }

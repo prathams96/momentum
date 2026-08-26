@@ -287,7 +287,7 @@ private struct PostWorkoutCheckInView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Post-workout care") {
+                Section("Post-workout personal care") {
                     Toggle("Heavy sweating?", isOn: $heavySweating)
                     if heavySweating {
                         Toggle("Going outdoors again?", isOn: $goingOutdoorsAgain)

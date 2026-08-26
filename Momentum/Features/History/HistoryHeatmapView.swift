@@ -154,20 +154,20 @@ struct HistoryHeatmapView: View {
             }
 
             HStack(alignment: .top, spacing: MomentumSpacing.xs) {
-                VStack(spacing: cellPitch - cellSize) {
+                VStack(spacing: cellSpacing) {
                     ForEach(weekdayLabels, id: \.self) { label in
                         Text(label)
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
-                            .frame(width: 18, height: cellPitch)
+                            .frame(width: 18, height: cellSlot)
                             .accessibilityHidden(true)
                     }
                 }
 
                 ScrollView(.horizontal) {
-                    LazyHStack(spacing: cellPitch - cellSize) {
+                    LazyHStack(spacing: cellSpacing) {
                         ForEach(Array(weeks.enumerated()), id: \.offset) { _, week in
-                            VStack(spacing: cellPitch - cellSize) {
+                            VStack(spacing: cellSpacing) {
                                 ForEach(week, id: \.self) { day in
                                     dayCell(day)
                                 }
@@ -186,16 +186,20 @@ struct HistoryHeatmapView: View {
         .accessibilityElement(children: .contain)
     }
 
-    private let cellSize: CGFloat = 20
-    private var cellPitch: CGFloat { cellSize + 3 }
+    /// Visual cells stay within DESIGN.md's 11–13-point heatmap guidance;
+    /// each grid slot is a larger uniform hit target so labels stay aligned.
+    private let cellSize: CGFloat = 12
+    private let cellSlot: CGFloat = 26
+    private var cellSpacing: CGFloat { 4 }
 
     private func dayCell(_ day: DomainDay) -> some View {
         let presentation = presentation(for: day)
         return NavigationLink(value: day) {
             RhythmDayCell(presentation: presentation)
                 .frame(width: cellSize, height: cellSize)
-                // Generous hit area around the small visual cell.
-                .frame(width: max(cellSize, 32), height: max(cellSize, 32))
+                // The whole grid slot is the hit target; it participates in
+                // layout uniformly so weekday labels stay aligned.
+                .frame(width: cellSlot, height: cellSlot)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -260,6 +264,8 @@ private struct LegendSwatch: View {
 
 struct HistoryDayRow: View {
     let day: DomainDay
+    /// Only enabled modules' records may appear in the summary.
+    let enabledIDs: Set<ModuleID>
     let sessions: [WorkoutSessionRecord]
     let workoutEvents: [WorkoutDayEventRecord]
     let nutritionDays: [NutritionDayRecord]
@@ -270,24 +276,30 @@ struct HistoryDayRow: View {
 
     private var labels: [String] {
         var values: [String] = []
-        if sessions.contains(where: {
-            $0.deletedAt == nil && $0.completionDomainDay == dayKey
-        }) {
-            values.append("Workout finished")
-        } else if let event = workoutEvents.first(where: {
-            $0.deletedAt == nil && $0.domainDay == dayKey
-        }) {
-            values.append("Workout \(event.kindRaw)")
+        if enabledIDs.contains(BuiltInModuleID.workout) {
+            if sessions.contains(where: {
+                $0.deletedAt == nil && $0.completionDomainDay == dayKey
+            }) {
+                values.append("Workout finished")
+            } else if let event = workoutEvents.first(where: {
+                $0.deletedAt == nil && $0.domainDay == dayKey
+            }) {
+                values.append("Workout \(event.kindRaw)")
+            }
         }
-        let foods = foodEntries.count {
-            $0.deletedAt == nil && $0.domainDay == dayKey
+        if enabledIDs.contains(BuiltInModuleID.nutrition) {
+            let foods = foodEntries.count {
+                $0.deletedAt == nil && $0.domainDay == dayKey
+            }
+            if foods > 0 { values.append("\(foods) food \(foods == 1 ? "entry" : "entries")") }
+            if nutritionDays.contains(where: { $0.domainDay == dayKey && $0.finalizedAt != nil }) {
+                values.append("Nutrition finalized")
+            }
         }
-        if foods > 0 { values.append("\(foods) food \(foods == 1 ? "entry" : "entries")") }
-        if nutritionDays.contains(where: { $0.domainDay == dayKey && $0.finalizedAt != nil }) {
-            values.append("Nutrition finalized")
+        if enabledIDs.contains(BuiltInModuleID.care) {
+            let care = careOccurrences.count { $0.dueDomainDay == dayKey }
+            if care > 0 { values.append("\(care) personal care \(care == 1 ? "routine" : "routines")") }
         }
-        let care = careOccurrences.count { $0.dueDomainDay == dayKey }
-        if care > 0 { values.append("\(care) personal care \(care == 1 ? "routine" : "routines")") }
         return values
     }
 

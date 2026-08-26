@@ -91,6 +91,7 @@ struct HistoryView: View {
                         NavigationLink(value: day) {
                             HistoryDayRow(
                                 day: day,
+                                enabledIDs: enabledIDs,
                                 sessions: sessions,
                                 workoutEvents: workoutEvents,
                                 nutritionDays: nutritionDays,

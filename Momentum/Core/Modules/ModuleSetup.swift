@@ -11,13 +11,14 @@ import SwiftData
 @MainActor
 enum ModuleSetup {
     static func ensureDefaults(
-        for newlyEnabled: Set<ModuleID>,
+        for enabled: Set<ModuleID>,
         unitSystemRaw: String,
+        domainDayCutoffMinutes: Int = 180,
         now: Date = .now,
         calendar: Calendar = .autoupdatingCurrent,
         in context: ModelContext
     ) throws {
-        if newlyEnabled.contains(BuiltInModuleID.hydration) {
+        if enabled.contains(BuiltInModuleID.hydration) {
             _ = HydrationPlanService.fetchOrCreate(
                 in: context,
                 now: now,
@@ -25,8 +26,12 @@ enum ModuleSetup {
             )
         }
 
-        if newlyEnabled.contains(BuiltInModuleID.nutrition) {
-            let currentDay = DomainDay.containing(now, calendar: calendar, cutoffMinutes: 180)
+        if enabled.contains(BuiltInModuleID.nutrition) {
+            let currentDay = DomainDay.containing(
+                now,
+                calendar: calendar,
+                cutoffMinutes: domainDayCutoffMinutes
+            )
             let effectiveFrom = PersistedDomainDay.encode(currentDay)
             let targets = try context.fetch(FetchDescriptor<NutritionTargetRecord>())
             let hasOpenTarget = targets.contains { $0.effectiveTo == nil && $0.effectiveFrom <= effectiveFrom }
