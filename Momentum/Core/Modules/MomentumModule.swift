@@ -105,6 +105,14 @@ protocol NotificationCategoryProviding: MomentumModule {
     func notificationCategory() -> UNNotificationCategory
 }
 
+/// Creates the defaults a module needs to be fully usable at its first
+/// surface visit after enablement (pre-launch spec §4 · Setup steps). Every
+/// enabled module gets a chance; what "defaults" means is module-owned.
+@MainActor
+protocol LazyDefaultProviding: MomentumModule {
+    func createDefaultsIfNeeded(in context: ModuleContext) throws
+}
+
 /// Supplies CSV export definitions; filenames of migrated modules are frozen.
 struct ModuleExportDefinition {
     let moduleID: ModuleID

@@ -5,9 +5,17 @@ import XCTest
 
 @MainActor
 final class EveningMergeFallbackTests: XCTestCase {
-    private func components(_ day: DomainDay, hour: Int, minute: Int = 0) -> DateComponents {
+    private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    private func date(_ day: DomainDay, hour: Int) -> Date {
+        PersistedDomainDay.date(for: day, calendar: calendar, hour: hour)!
+    }
+
+    private func components(_ day: DomainDay, hour: Int, minute: Int = 0) -> DateComponents {
         let date = PersistedDomainDay.date(for: day, calendar: calendar, hour: hour, minute: minute)!
         return calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
     }
@@ -103,19 +111,21 @@ final class EveningMergeFallbackTests: XCTestCase {
     }
 
     func testModuleSetupLazilyCreatesDefaultsForLaterEnabledModules() throws {
+        let day = DomainDay(year: 2026, month: 8, day: 25)
         let container = try ModelContainerFactory.makePreview()
         let context = container.mainContext
-        context.insert(AppSettingsRecord())
+        context.insert(AppSettingsRecord(unitSystemRaw: "imperial"))
         try context.save()
 
         try ModuleSetup.ensureDefaults(
-            for: [BuiltInModuleID.hydration, BuiltInModuleID.nutrition],
-            unitSystemRaw: "imperial",
+            enabledIDs: [BuiltInModuleID.hydration, BuiltInModuleID.nutrition],
+            settings: AppSettingsRecord.canonical(in: try context.fetch(FetchDescriptor<AppSettingsRecord>())),
+            now: date(day, hour: 12),
             in: context
         )
 
         let plan = try XCTUnwrap(HydrationPlanService.plan(in: context))
-        XCTAssertEqual(HydrationEngine.fluidOunces(fromML: plan.targetML), 85)
+        XCTAssertEqual(HydrationEngine.fluidOuncesDisplay(fromML: plan.targetML), "85")
 
         let targets = try context.fetch(FetchDescriptor<NutritionTargetRecord>())
         XCTAssertEqual(targets.count, 1)
@@ -123,8 +133,9 @@ final class EveningMergeFallbackTests: XCTestCase {
 
         // Idempotent on repeated enablement.
         try ModuleSetup.ensureDefaults(
-            for: [BuiltInModuleID.hydration, BuiltInModuleID.nutrition],
-            unitSystemRaw: "imperial",
+            enabledIDs: [BuiltInModuleID.hydration, BuiltInModuleID.nutrition],
+            settings: AppSettingsRecord.canonical(in: try context.fetch(FetchDescriptor<AppSettingsRecord>())),
+            now: date(day, hour: 12),
             in: context
         )
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<HydrationPlanRecord>()), 1)

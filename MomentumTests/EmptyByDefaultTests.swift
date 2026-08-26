@@ -36,6 +36,39 @@ final class EmptyByDefaultTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<CareRoutineTemplateRecord>()), 5)
     }
 
+    func testUninstallExamplePlanRestoresEmptyByDefault() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        try SeedData.install(in: context, currentDomainDay: DomainDay(year: 2026, month: 8, day: 2))
+
+        try SeedData.uninstallExamplePlan(in: context)
+
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutTemplateRecord>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<ExercisePrescriptionRecord>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<ExerciseAlternativeRecord>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CareRoutineTemplateRecord>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CareTaskTemplateRecord>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CycleAnchorRecord>()), 0)
+    }
+
+    func testUninstallExamplePlanRefusesWhenHistoryExists() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        try SeedData.install(in: context, currentDomainDay: DomainDay(year: 2026, month: 8, day: 2))
+        context.insert(WorkoutSessionRecord(
+            workoutNameSnapshot: "Upper A",
+            scheduledDomainDay: "2026-08-02",
+            finishedAt: Date(timeIntervalSince1970: 100),
+            completionDomainDay: "2026-08-02"
+        ))
+        try context.save()
+
+        try SeedData.uninstallExamplePlan(in: context)
+
+        // Recorded history pins the seed content in place.
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<WorkoutTemplateRecord>()), 4)
+    }
+
     func testImperialLocaleDefaultsRenderAsWholeFluidOunces() throws {
         let container = try ModelContainerFactory.makePreview()
         let context = container.mainContext

@@ -16,6 +16,7 @@ struct OnboardingView: View {
     @State private var planChoice: PlanChoice?
     @State private var trackNutrition = true
     @State private var isInstallingExamplePlan = false
+    @State private var didInstallExamplePlan = false
     @State private var selectedWorkoutID: UUID?
     @State private var dueToday = true
     @State private var calorieTarget = "2400"
@@ -521,6 +522,7 @@ struct OnboardingView: View {
                 hasPreparedDrafts = false
                 prepareDraftsIfNeeded()
                 selectedWorkoutID = workouts.first?.id
+                didInstallExamplePlan = true
                 withAnimation(.easeOut(duration: 0.2)) {
                     planChoice = .examplePlan
                 }
@@ -790,6 +792,17 @@ struct OnboardingView: View {
                 original.record.updatedAt = original.updatedAt
             }
             presentedAlert = .saveFailed
+
+            // The example plan was already persisted by its own installation
+            // save; a failed completion must restore empty-by-default and put
+            // the owner back on the plan-choice step.
+            if didInstallExamplePlan {
+                try? SeedData.uninstallExamplePlan(in: modelContext)
+                didInstallExamplePlan = false
+                self.selectedWorkoutID = nil
+                planChoice = nil
+                step = 1
+            }
         }
     }
 

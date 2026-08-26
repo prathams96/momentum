@@ -157,7 +157,7 @@ struct HistoryHeatmapView: View {
                 VStack(spacing: cellSpacing) {
                     ForEach(weekdayLabels, id: \.self) { label in
                         Text(label)
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(width: 18, height: cellSlot)
                             .accessibilityHidden(true)
@@ -232,7 +232,7 @@ struct HistoryHeatmapView: View {
             }
             Text("Partial → Complete")
         }
-        .font(.caption2)
+        .font(.caption)
         .foregroundStyle(.secondary)
         .accessibilityElement(children: .combine)
     }

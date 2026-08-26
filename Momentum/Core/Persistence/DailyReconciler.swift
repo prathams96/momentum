@@ -56,9 +56,8 @@ enum DailyReconciler {
         if let settings {
             do {
                 try ModuleSetup.ensureDefaults(
-                    for: enabledIDs,
-                    unitSystemRaw: settings.unitSystemRaw,
-                    domainDayCutoffMinutes: settings.domainDayCutoffMinutes,
+                    enabledIDs: enabledIDs,
+                    settings: settings,
                     now: now,
                     calendar: calendar,
                     in: context

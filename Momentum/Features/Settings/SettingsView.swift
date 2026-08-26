@@ -428,9 +428,8 @@ struct SettingsView: View {
         do {
             // Later-enabled modules get their defaults lazily (spec §4).
             try ModuleSetup.ensureDefaults(
-                for: draft.enabledModuleIDs,
-                unitSystemRaw: settings.unitSystemRaw,
-                domainDayCutoffMinutes: settings.domainDayCutoffMinutes,
+                enabledIDs: draft.enabledModuleIDs,
+                settings: settings,
                 in: modelContext
             )
             try modelContext.save()

@@ -107,6 +107,43 @@ enum SeedData {
         try context.save()
     }
 
+    /// Removes example-plan content when onboarding completion later fails,
+    /// restoring empty-by-default. Refuses to run once any real usage exists
+    /// (a finished workout session or a care occurrence), so it can never
+    /// destroy recorded history.
+    static func uninstallExamplePlan(in context: ModelContext) throws {
+        let finishedSessions = try context.fetch(FetchDescriptor<WorkoutSessionRecord>())
+            .filter { $0.finishedAt != nil && $0.deletedAt == nil }
+        let occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
+            .filter { !$0.isDeleted }
+        let foodEntries = try context.fetch(FetchDescriptor<FoodEntryRecord>())
+            .filter { $0.deletedAt == nil }
+        guard finishedSessions.isEmpty, occurrences.isEmpty, foodEntries.isEmpty else { return }
+
+        for suggestion in try context.fetch(FetchDescriptor<LoadSuggestionRecord>()) {
+            context.delete(suggestion)
+        }
+        for alternative in try context.fetch(FetchDescriptor<ExerciseAlternativeRecord>()) {
+            context.delete(alternative)
+        }
+        for prescription in try context.fetch(FetchDescriptor<ExercisePrescriptionRecord>()) {
+            context.delete(prescription)
+        }
+        for anchor in try context.fetch(FetchDescriptor<CycleAnchorRecord>()) {
+            context.delete(anchor)
+        }
+        for workout in try context.fetch(FetchDescriptor<WorkoutTemplateRecord>()) {
+            context.delete(workout)
+        }
+        for task in try context.fetch(FetchDescriptor<CareTaskTemplateRecord>()) {
+            context.delete(task)
+        }
+        for routine in try context.fetch(FetchDescriptor<CareRoutineTemplateRecord>()) {
+            context.delete(routine)
+        }
+        try context.save()
+    }
+
     private static func encode(_ day: DomainDay) -> String {
         "\(day.year)-\(String(format: "%02d", day.month))-\(String(format: "%02d", day.day))"
     }
