@@ -1,39 +1,79 @@
 import Foundation
 
-/// Generic, domain-agnostic bundling of notification candidates that fire at
-/// the same moment (parent-spec decision 4): a candidate whose fire time is
-/// within `proximityMinutes` of an anchor candidate on the same day loses its
-/// own notification and its identity is folded into the anchor's body. The
-/// bundler knows nothing about which module produced a candidate — anchors are
-/// recognized purely by their notification category.
+/// Generic, domain-agnostic merging of notification candidates (pre-launch
+/// spec §6): each enabled module contributes candidates carrying its own
+/// sentence fragment plus an optional deep-link payload. A candidate whose
+/// fire time is within `proximityMinutes` of an evening anchor on the same day
+/// loses its own notification and its fragment merges into one Evening
+/// check-in firing at the earliest contributed time. The bundler knows nothing
+/// about which module produced a candidate — anchors are recognized purely by
+/// their notification category.
 enum ReminderBundler {
     static func bundle(
         _ candidates: [ScheduledReminder],
         anchorCategory: String,
-        proximityMinutes: Int = 0
+        proximityMinutes: Int = 30,
+        fallbackAnchorDateComponents: DateComponents? = nil
     ) -> [ScheduledReminder] {
-        let anchors = candidates.filter { $0.categoryIdentifier == anchorCategory }
-        guard !anchors.isEmpty else { return candidates }
+        var anchors = candidates.filter { $0.categoryIdentifier == anchorCategory }
 
-        var foldedByAnchor: [String: [ScheduledReminder]] = [:]
-        var foldedIdentifiers = Set<String>()
-        for anchor in anchors {
-            let nearby = candidates.filter { candidate in
-                candidate.identifier != anchor.identifier
-                    && candidate.categoryIdentifier != anchorCategory
-                    && firesWithin(candidate.dateComponents, of: anchor.dateComponents, minutes: proximityMinutes)
+        // One-notification-max guarantee (spec §6): when no module supplied
+        // an anchor (e.g. nutrition disabled or already finalized), Core's
+        // fallback time seeds a synthetic Evening check-in so nearby
+        // candidates still merge instead of firing individually.
+        if anchors.isEmpty, let fallback = fallbackAnchorDateComponents {
+            let seeded = candidates.filter {
+                firesWithin($0.dateComponents, of: fallback, minutes: proximityMinutes)
             }
-            if !nearby.isEmpty {
-                foldedByAnchor[anchor.identifier] = nearby
-                foldedIdentifiers.formUnion(nearby.map(\.identifier))
+            guard !seeded.isEmpty else { return candidates }
+            let earliest = seeded.map(\.dateComponents).reduce(fallback) {
+                minuteOfDay($0) <= minuteOfDay($1) ? $0 : $1
+            }
+            anchors = [ScheduledReminder(
+                identifier: "evening.checkin.merged",
+                title: "Evening check-in",
+                body: "",
+                categoryIdentifier: anchorCategory,
+                dateComponents: earliest,
+                userInfo: [:]
+            )]
+        }
+
+        guard let primary = anchors.first else { return candidates }
+
+        // Transitive clustering: absorb any candidate within the proximity
+        // window of an already-clustered candidate, so chained reminders
+        // collapse into the single Evening check-in instead of firing
+        // separately. Candidates far outside every cluster (e.g. a daytime
+        // workout reminder) keep their own actionable notification.
+        var clustered = Set([primary.identifier])
+        var clusterTimes = [primary.dateComponents]
+        var changed = true
+        while changed {
+            changed = false
+            for candidate in candidates where !clustered.contains(candidate.identifier) {
+                if clusterTimes.contains(where: {
+                    firesWithin(candidate.dateComponents, of: $0, minutes: proximityMinutes)
+                }) {
+                    clustered.insert(candidate.identifier)
+                    clusterTimes.append(candidate.dateComponents)
+                    changed = true
+                }
             }
         }
 
-        return candidates.compactMap { candidate in
-            if foldedIdentifiers.contains(candidate.identifier) { return nil }
-            guard let folded = foldedByAnchor[candidate.identifier] else { return candidate }
-            return fold(folded, into: candidate)
+        let folded = candidates.filter {
+            clustered.contains($0.identifier) && $0.identifier != primary.identifier
         }
+        guard !folded.isEmpty else {
+            // Nothing folded (a synthesized anchor always folds its seeds, so
+            // this can only happen for a real anchor with no neighbours).
+            return candidates
+        }
+
+        var result = candidates.filter { !clustered.contains($0.identifier) }
+        result.append(merge(folded, into: primary))
+        return result
     }
 
     private static func firesWithin(
@@ -51,25 +91,28 @@ enum ReminderBundler {
         (components.hour ?? 0) * 60 + (components.minute ?? 0)
     }
 
-    private static func fold(
-        _ folded: [ScheduledReminder],
+    /// One notification max per evening: the contributed fragments concatenate
+    /// verbatim and the merged reminder fires at the earliest contributed
+    /// time — never later than any folded candidate's own reminder.
+    private static func merge(
+        _ merged: [ScheduledReminder],
         into anchor: ScheduledReminder
     ) -> ScheduledReminder {
-        let baseBody = anchor.body.hasSuffix(".") ? String(anchor.body.dropLast()) : anchor.body
-        let phrases = folded.map { "check your \($0.title) routine" }
-        var userInfo = anchor.userInfo
-        if let carrier = folded.first(where: { $0.userInfo["actionKind"] == "careDue" }),
-           let occurrenceID = carrier.userInfo["occurrenceID"] {
-            userInfo["occurrenceID"] = occurrenceID
-        }
+        let fragments = ([anchor.body] + merged.map(\.body))
+            .filter { !$0.isEmpty }
+            .map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 }
+        let earliest = merged
+            .map(\.dateComponents)
+            .filter { minuteOfDay($0) < minuteOfDay(anchor.dateComponents) }
+            .min(by: { minuteOfDay($0) < minuteOfDay($1) }) ?? anchor.dateComponents
         return ScheduledReminder(
             identifier: anchor.identifier,
             title: anchor.title,
-            body: baseBody + " and " + phrases.joined(separator: " and ") + ".",
+            body: fragments.joined(separator: ". ") + ".",
             categoryIdentifier: anchor.categoryIdentifier,
-            dateComponents: anchor.dateComponents,
+            dateComponents: earliest,
             repeats: anchor.repeats,
-            userInfo: userInfo
+            userInfo: anchor.userInfo
         )
     }
 }

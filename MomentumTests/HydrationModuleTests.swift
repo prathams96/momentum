@@ -208,13 +208,13 @@ final class HydrationModuleTests: XCTestCase {
     }
 
     func testMasterToggleOffEmitsNoReminders() throws {
-        try reminderSetup(targetML: 2500, remindersEnabled: false) { context, day in
+        reminderSetup(targetML: 2500, remindersEnabled: false) { context, day in
             XCTAssertEqual(hydration(derive(context, at: date(day, hour: 15))), [])
         }
     }
 
     func testQuietHoursSuppressReminders() throws {
-        try reminderSetup(targetML: 2500, remindersEnabled: true) { context, day in
+        reminderSetup(targetML: 2500, remindersEnabled: true) { context, day in
             XCTAssertEqual(hydration(derive(context, at: date(day, hour: 7))), [])
             XCTAssertEqual(hydration(derive(context, at: date(day, hour: 22))), [])
         }
@@ -351,12 +351,9 @@ final class HydrationModuleTests: XCTestCase {
             XCTAssertEqual(module.categoryStreak(asOf: day, in: moduleContext), 0)
             XCTAssertEqual(module.categoryStreak(asOf: previous, in: moduleContext), 1)
 
-            // The all-category adherence score treats hydration as one activity.
-            let score = HistoryProjection.adherenceScore(
-                on: previous,
-                facts: module.historyFacts(in: moduleContext),
-                category: .all
-            )
+            // The hydration module folds its day into one scored activity.
+            let activities = module.adherenceActivities(on: previous, facts: module.historyFacts(in: moduleContext))
+            let score = AdherenceEngine().dailyScore(activities: activities)
             XCTAssertEqual(score, .score(completedCount: 1, dueCount: 1, percentage: 100))
         }
     }

@@ -537,11 +537,43 @@ final class MomentumAppTests: XCTestCase {
 
         XCTAssertEqual(reminders.count, 1)
         XCTAssertEqual(reminders.first?.categoryIdentifier, MomentumNotificationCategory.eveningCheckIn)
-        XCTAssertEqual(reminders.first?.userInfo["occurrenceID"], occurrence.id.uuidString)
+        // The generic merge contract carries no deep-link passthrough; tap
+        // routes to Today, never directly to a module sheet.
+        XCTAssertNil(reminders.first?.userInfo["occurrenceID"])
         XCTAssertEqual(
             reminders.first?.body,
-            "Finish logging today’s food and check your Night skincare routine."
+            "Finish logging today’s food. Complete Night skincare."
         )
+    }
+
+    func testEveningMergeFiresAtEarliestContributedTimeWithinWindow() throws {
+        let container = try ModelContainerFactory.makePreview()
+        let context = container.mainContext
+        let day = DomainDay(year: 2026, month: 8, day: 2)
+        context.insert(AppSettingsRecord(
+            domainDayCutoffMinutes: 180,
+            nutritionReminderMinutes: 22 * 60
+        ))
+        context.insert(CareOccurrenceRecord(
+            routineNameSnapshot: "Night care",
+            routineRoleRaw: "night",
+            dueDomainDay: "2026-08-02",
+            dueAt: PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 21, minute: 40)!
+        ))
+        try context.save()
+
+        let now = PersistedDomainDay.date(for: day, calendar: .autoupdatingCurrent, hour: 12)!
+        let reminders = DailyReconciler.deriveReminders(
+            settings: AppSettingsRecord.canonical(in: try context.fetch(FetchDescriptor<AppSettingsRecord>())),
+            in: context,
+            now: now,
+            calendar: .autoupdatingCurrent
+        )
+
+        let evening = try XCTUnwrap(reminders.first { $0.categoryIdentifier == MomentumNotificationCategory.eveningCheckIn })
+        XCTAssertEqual(evening.userInfo["occurrenceID"], nil)
+        XCTAssertEqual(evening.dateComponents.hour, 21)
+        XCTAssertEqual(evening.dateComponents.minute, 40)
     }
 
     func testCompletingAlternatingCareFromNotificationAdvancesRecurrence() throws {

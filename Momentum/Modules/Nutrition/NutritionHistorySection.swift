@@ -34,6 +34,15 @@ extension NutritionModuleAdapter: HistoryContributing {
             )
         )
     }
+
+    func adherenceActivities(on day: DomainDay, facts: [HistoryAdherenceFact]) -> [DueAdherenceActivity] {
+        let matching = facts.filter { $0.day == day && $0.category == .nutrition }
+        guard !matching.isEmpty else { return [] }
+        return [DueAdherenceActivity(
+            kind: .nutritionFinalization,
+            isCompleted: matching.contains(where: \.isCompleted)
+        )]
+    }
 }
 
 /// The nutrition module's contribution to one recorded history day.

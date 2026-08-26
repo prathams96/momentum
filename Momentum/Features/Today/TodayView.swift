@@ -25,25 +25,32 @@ struct TodayView: View {
 
     var body: some View {
         let context = ModuleContext.make(in: modelContext, settings: canonicalSettings)
+        let enabledIDs = ModuleEnablementStore.enabledIDs(from: canonicalSettings)
         let contributors = ModuleRegistry.standard
-            .enabledModules(ModuleEnablementStore.enabledIDs(from: canonicalSettings))
+            .enabledModules(enabledIDs)
             .compactMap { $0 as? any TodayContributing }
         let contributions = contributors.compactMap { $0.todayContribution(in: context) }
         let sections = contributors.compactMap { $0.todaySection(in: context) }
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: MomentumSpacing.xl) {
-                dateLine(contributions)
-                ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
-                    section
+        Group {
+            if enabledIDs.isEmpty {
+                allModulesOffState
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: MomentumSpacing.xl) {
+                        dateLine(contributions)
+                        ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                            section
+                        }
+                        consistencySection
+                    }
+                    .padding(.horizontal, MomentumSpacing.md)
+                    .padding(.top, MomentumSpacing.xs)
+                    .padding(.bottom, 96)
                 }
-                consistencySection
+                .background(Color(uiColor: .systemBackground))
             }
-            .padding(.horizontal, MomentumSpacing.md)
-            .padding(.top, MomentumSpacing.xs)
-            .padding(.bottom, 96)
         }
-        .background(Color(uiColor: .systemBackground))
         .navigationTitle("Today")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
@@ -82,55 +89,59 @@ struct TodayView: View {
             date: PersistedDomainDay.date(for: currentDomainDay, calendar: calendar)?.formatted(date: .complete, time: .omitted) ?? "Today",
             accessibilityDate: PersistedDomainDay.date(for: currentDomainDay, calendar: calendar)?.formatted(date: .abbreviated, time: .omitted) ?? "Today",
             stages: stages,
-            callout: dailyThreadCallout(contributions: contributions, stages: stages)
+            callout: dailyThreadCallout(contributions)
         )
     }
 
     private func dailyThreadStages(from contributions: [TodayContribution]) -> [DailyThreadStageModel] {
-        var stages = contributions.map { contribution in
-            DailyThreadStageModel(
-                title: contribution.title,
-                symbol: contribution.symbolName,
-                tint: contribution.tint,
-                isFocused: false
-            )
-        }
-        stages.append(DailyThreadStageModel(title: "Reflect", symbol: "chart.xyaxis.line", tint: nil, isFocused: false))
-
-        if let focusIndex = contributions.firstIndex(where: { $0.state != .completed }) {
-            stages[focusIndex].isFocused = true
-        } else {
-            stages[stages.count - 1].isFocused = true
-        }
-        return stages
+        DailyThreadFocus.stages(from: contributions)
     }
 
-    private func dailyThreadCallout(contributions: [TodayContribution], stages: [DailyThreadStageModel]) -> String {
-        if let attention = contributions.first(where: { $0.state == .attention }) {
-            return attention.title == "Workout" ? "Repair workout plan" : "\(attention.title) needs attention"
+    private func dailyThreadCallout(_ contributions: [TodayContribution]) -> String {
+        DailyThreadFocus.callout(contributions: contributions)
+    }
+
+    /// The app-level empty state (pre-launch spec §4): one quiet line with a
+    /// Settings link — not a set of per-module placeholders.
+    private var allModulesOffState: some View {
+        VStack(spacing: MomentumSpacing.md) {
+            Text("Nothing is being tracked yet.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+            NavigationLink {
+                SettingsView()
+            } label: {
+                Label("Open Settings", systemImage: "gearshape")
+            }
         }
-        if let focused = stages.first(where: \.isFocused) {
-            return "\(focused.title) next"
-        }
-        return "Reflect next"
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(MomentumSpacing.lg)
     }
 
     // MARK: - Consistency
 
     private var consistencySection: some View {
-        TodayConsistencySection(currentDay: currentDomainDay, calendar: calendar)
+        TodayConsistencySection(
+            settings: canonicalSettings,
+            currentDay: currentDomainDay,
+            calendar: calendar
+        )
     }
 }
 
-// MARK: - Daily thread visuals
+private struct TodayConsistencySection: View {
+    let settings: AppSettingsRecord?
+    let currentDay: DomainDay
+    let calendar: Calendar
 
-struct DailyThreadStageModel: Identifiable {
-    let title: String
-    let symbol: String
-    let tint: Color?
-    var isFocused: Bool
-
-    var id: String { title }
+    var body: some View {
+        RhythmStripsSection(
+            title: "Consistency",
+            settings: settings,
+            currentDay: currentDay,
+            calendar: calendar
+        )
+    }
 }
 
 private struct DailyThreadHeader: View {
@@ -145,7 +156,7 @@ private struct DailyThreadHeader: View {
     @State private var isRevealed = false
 
     private var focusedTitle: String {
-        stages.first(where: \.isFocused)?.title ?? "Reflect"
+        stages.first(where: \.isFocused)?.title ?? ""
     }
 
     private var stageSummary: String {
@@ -307,53 +318,5 @@ private struct DailyThreadStageView: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Consistency
-
-private struct TodayConsistencySection: View {
-    @Query private var sessions: [WorkoutSessionRecord]
-    @Query private var workoutEvents: [WorkoutDayEventRecord]
-    @Query private var nutritionDays: [NutritionDayRecord]
-    @Query private var careOccurrences: [CareOccurrenceRecord]
-
-    let currentDay: DomainDay
-    let calendar: Calendar
-
-    private var adherenceFacts: [HistoryAdherenceFact] {
-        let interval = MomentumDiagnostics.signposter.beginInterval("TodayAggregation")
-        defer {
-            MomentumDiagnostics.signposter.endInterval("TodayAggregation", interval)
-        }
-        return HistoryProjection.facts(
-            sessions: sessions,
-            workoutEvents: workoutEvents,
-            nutritionDays: nutritionDays,
-            careOccurrences: careOccurrences
-        )
-    }
-
-    private var adherenceStreaks: HistoryStreakSummary {
-        HistoryProjection.streaks(facts: adherenceFacts, calendar: calendar)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Consistency")
-                    .font(.title3.bold())
-                Spacer()
-                Text("Last 16 weeks")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            CompactHistoryHeatmapView(currentDay: currentDay, calendar: calendar) { day in
-                HistoryProjection.adherenceScore(on: day, facts: adherenceFacts, category: .all)
-            }
-
-            HistoryStreakSummaryView(summary: adherenceStreaks, category: .all)
-        }
     }
 }

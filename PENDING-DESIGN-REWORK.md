@@ -1,6 +1,6 @@
 # Pending Design Rework
 
-**Status:** Planning — nothing here is started.
+**Status:** Superseded by [PRELAUNCH-DESIGN-SPEC.md](./PRELAUNCH-DESIGN-SPEC.md) — all items resolved 25 Aug 2026.
 **Source:** [MODULAR-REFACTOR-PARENT-SPEC.md](./MODULAR-REFACTOR-PARENT-SPEC.md) §7 (pre-release UX overhaul backlog), [MOMENTUM-MODULAR-ARCHITECTURE-SPEC.md](./MOMENTUM-MODULAR-ARCHITECTURE-SPEC.md) Phases G–H, and open findings from the 25 Aug 2026 branch review of `feat/modular-refactor-hydration`.
 **Constraint:** all of this is *pre-public-launch* work; the migrated behavior it replaces is preserved deliberately through migration only.
 

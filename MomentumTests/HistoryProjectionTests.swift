@@ -21,28 +21,45 @@ final class HistoryProjectionTests: XCTestCase {
         XCTAssertEqual(days.last, DomainDay(year: 2026, month: 8, day: 2))
     }
 
-    func test_allCategoryScoreWeightsWorkoutNutritionAndEachCareRoutineEqually() {
+    @MainActor
+    func test_careModuleFoldsEachDueRoutineSeparatelyWithoutBlending() {
         let day = DomainDay(year: 2026, month: 8, day: 2)
         let facts = [
-            HistoryAdherenceFact(day: day, category: .workouts, isCompleted: true),
-            HistoryAdherenceFact(day: day, category: .nutrition, isCompleted: false),
             HistoryAdherenceFact(day: day, category: .care, isCompleted: true),
-            HistoryAdherenceFact(day: day, category: .care, isCompleted: false)
+            HistoryAdherenceFact(day: day, category: .care, isCompleted: false),
+            HistoryAdherenceFact(day: day, category: .workouts, isCompleted: true)
         ]
+        let care = ModuleRegistry.standard.module(with: BuiltInModuleID.care)
+        let workout = ModuleRegistry.standard.module(with: BuiltInModuleID.workout)
 
+        let careActivities = (care as? any HistoryContributing)?
+            .adherenceActivities(on: day, facts: facts) ?? []
+        let workoutActivities = (workout as? any HistoryContributing)?
+            .adherenceActivities(on: day, facts: facts) ?? []
+
+        XCTAssertEqual(careActivities.count, 2)
         XCTAssertEqual(
-            HistoryProjection.adherenceScore(on: day, facts: facts, category: .all),
-            .score(completedCount: 2, dueCount: 4, percentage: 50)
+            AdherenceEngine().dailyScore(activities: careActivities),
+            .score(completedCount: 1, dueCount: 2, percentage: 50)
+        )
+        // The workout module never claims another category's obligations.
+        XCTAssertEqual(
+            AdherenceEngine().dailyScore(activities: workoutActivities),
+            .score(completedCount: 1, dueCount: 1, percentage: 100)
         )
     }
 
-    func test_measurementsAreFactsNotAdherenceObligations() {
+    @MainActor
+    func test_measurementsModuleContributesNoAdherenceObligations() {
+        let day = DomainDay(year: 2026, month: 8, day: 2)
+
+        // No module claims the measurements category, so nothing is due.
+        let activities = ModuleRegistry.standard.modules
+            .compactMap { $0 as? any HistoryContributing }
+            .flatMap { $0.adherenceActivities(on: day, facts: []) }
+
         XCTAssertEqual(
-            HistoryProjection.adherenceScore(
-                on: DomainDay(year: 2026, month: 8, day: 2),
-                facts: [],
-                category: .measurements
-            ),
+            AdherenceEngine().dailyScore(activities: activities),
             .noObligation
         )
     }

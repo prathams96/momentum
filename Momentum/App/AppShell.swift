@@ -25,7 +25,7 @@ struct AppShell: View {
                         pendingWorkoutRoute = route
                     }
                     UNUserNotificationCenter.current().delegate = notificationDelegate
-                    Task { await NotificationScheduler().configureCategories() }
+                    NotificationScheduler.registerCategories()
                     refreshCloudAccountState()
                     evaluateTimeZoneAndReconcile()
                 }

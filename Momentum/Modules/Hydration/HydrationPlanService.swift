@@ -8,13 +8,29 @@ import SwiftData
 @MainActor
 enum HydrationPlanService {
     /// Lazily creates the singleton plan record. Safe to call inside
-    /// reconciliation (the orchestrator owns the save).
-    static func fetchOrCreate(in context: ModelContext, now: Date = .now) -> HydrationPlanRecord {
+    /// reconciliation (the orchestrator owns the save). Imperial locales get
+    /// ml-canonical values that render as whole fl oz (≈85 fl oz target,
+    /// 8/16/24 fl oz presets); storage stays millilitre-canonical.
+    static func fetchOrCreate(
+        in context: ModelContext,
+        now: Date = .now,
+        unitSystemRaw: String = "metric"
+    ) -> HydrationPlanRecord {
         let existing = (try? context.fetch(FetchDescriptor<HydrationPlanRecord>())) ?? []
-        if let canonical = existing.min { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) } {
+        if let canonical = existing.min(by: { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) }) {
             return canonical
         }
-        let plan = HydrationPlanRecord(createdAt: now, updatedAt: now)
+        let imperial = unitSystemRaw == UnitSystemOption.imperial.rawValue
+        let plan = imperial
+            ? HydrationPlanRecord(
+                targetML: 2_514,
+                firstPresetML: 237,
+                secondPresetML: 473,
+                thirdPresetML: 710,
+                createdAt: now,
+                updatedAt: now
+            )
+            : HydrationPlanRecord(createdAt: now, updatedAt: now)
         context.insert(plan)
         return plan
     }

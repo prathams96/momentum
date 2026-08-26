@@ -5,6 +5,23 @@ import SwiftData
 enum SeedData {
     static let currentVersion = 4
 
+    /// Empty-by-default (pre-launch spec §4): new installs get only a
+    /// canonical settings record — never example content. Example content
+    /// installs solely through explicit paths: the onboarding choice,
+    /// Settings' restore action, and dev restore.
+    static func ensureSettingsRecord(in context: ModelContext) throws {
+        let settingsRecords = try context.fetch(FetchDescriptor<AppSettingsRecord>())
+        let settings = AppSettingsRecord.canonical(in: settingsRecords)
+        for duplicate in settingsRecords where duplicate.id != settings?.id {
+            context.delete(duplicate)
+        }
+        if settings == nil {
+            context.insert(AppSettingsRecord())
+        }
+        try context.save()
+    }
+
+    /// Installs the example plan behind an explicit opt-in. Idempotent.
     static func install(
         in context: ModelContext,
         currentDomainDay: DomainDay = DomainDay.containing(
@@ -87,6 +104,43 @@ enum SeedData {
 
         settingsRecord.seedVersion = currentVersion
         settingsRecord.updatedAt = .now
+        try context.save()
+    }
+
+    /// Removes example-plan content when onboarding completion later fails,
+    /// restoring empty-by-default. Refuses to run once any real usage exists
+    /// (a finished workout session or a care occurrence), so it can never
+    /// destroy recorded history.
+    static func uninstallExamplePlan(in context: ModelContext) throws {
+        let finishedSessions = try context.fetch(FetchDescriptor<WorkoutSessionRecord>())
+            .filter { $0.finishedAt != nil && $0.deletedAt == nil }
+        let occurrences = try context.fetch(FetchDescriptor<CareOccurrenceRecord>())
+            .filter { !$0.isDeleted }
+        let foodEntries = try context.fetch(FetchDescriptor<FoodEntryRecord>())
+            .filter { $0.deletedAt == nil }
+        guard finishedSessions.isEmpty, occurrences.isEmpty, foodEntries.isEmpty else { return }
+
+        for suggestion in try context.fetch(FetchDescriptor<LoadSuggestionRecord>()) {
+            context.delete(suggestion)
+        }
+        for alternative in try context.fetch(FetchDescriptor<ExerciseAlternativeRecord>()) {
+            context.delete(alternative)
+        }
+        for prescription in try context.fetch(FetchDescriptor<ExercisePrescriptionRecord>()) {
+            context.delete(prescription)
+        }
+        for anchor in try context.fetch(FetchDescriptor<CycleAnchorRecord>()) {
+            context.delete(anchor)
+        }
+        for workout in try context.fetch(FetchDescriptor<WorkoutTemplateRecord>()) {
+            context.delete(workout)
+        }
+        for task in try context.fetch(FetchDescriptor<CareTaskTemplateRecord>()) {
+            context.delete(task)
+        }
+        for routine in try context.fetch(FetchDescriptor<CareRoutineTemplateRecord>()) {
+            context.delete(routine)
+        }
         try context.save()
     }
 

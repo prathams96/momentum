@@ -82,9 +82,13 @@ _Avoid_: Brand, product name
 
 ## Adherence
 
+**Daily Focus**:
+The single activity the Today surface presents as next: the first due, incomplete activity in the day's ordered contributions across enabled modules. When nothing is incomplete, Today presents the day as complete.
+_Avoid_: Reflect stage, Thread focus
+
 **Adherence Day**:
-A calendar day's completion percentage across activities due that day. Recovery Days add no workout obligation.
-_Avoid_: Active day
+A calendar day's completion percentage within one category across activities due that day. There is no blended score across categories. Recovery Days add no workout obligation.
+_Avoid_: Active day, Blended score, Daily score
 
 **Hydration Target**:
 The daily fluid-intake goal, evaluated against entries logged for a Domain Day.

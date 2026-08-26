@@ -8,6 +8,8 @@ public enum AdherenceActivityKind: Equatable, Sendable {
     case hairCare
     case postWorkoutCare
     case hydration
+    /// Generic due activity for modules that score without domain-specific kinds.
+    case categoryDue
 }
 
 public struct DueAdherenceActivity: Equatable, Sendable {

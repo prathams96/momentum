@@ -65,7 +65,7 @@ struct CareTodaySection: View {
 
     private var careContent: some View {
         VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-            Text("Care")
+            Text("Personal care")
                 .font(.title3.bold())
 
             VStack(spacing: 0) {
@@ -157,7 +157,7 @@ extension CareModuleAdapter: TodayContributing {
         }
 
         guard !todayOccurrences.isEmpty else {
-            return TodayContribution(metadata: metadata, state: .optional, accessibilitySummary: "Care. No routines due.")
+            return TodayContribution(metadata: metadata, state: .optional, accessibilitySummary: "Personal care. No routines due.")
         }
 
         let completedCount = todayOccurrences.count { ["completed", "skipped"].contains($0.statusRaw) }
@@ -166,7 +166,7 @@ extension CareModuleAdapter: TodayContributing {
         return TodayContribution(
             metadata: metadata,
             state: state,
-            accessibilitySummary: "Care. \(completedCount) of \(todayOccurrences.count) routines done."
+            accessibilitySummary: "Personal care. \(completedCount) of \(todayOccurrences.count) routines done."
         )
     }
 

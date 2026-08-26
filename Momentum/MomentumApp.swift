@@ -29,7 +29,8 @@ private enum PersistenceBootstrap {
     init() {
         do {
             let container = try Self.makeContainer(for: PersistenceStoreMode.current())
-            try SeedData.install(in: container.mainContext)
+            // Empty by default: launch only guarantees a settings record.
+            try SeedData.ensureSettingsRecord(in: container.mainContext)
             self = .ready(container)
         } catch {
             self = .failed

@@ -34,6 +34,13 @@ extension CareModuleAdapter: HistoryContributing {
             )
         )
     }
+
+    func adherenceActivities(on day: DomainDay, facts: [HistoryAdherenceFact]) -> [DueAdherenceActivity] {
+        // Each due Care Routine counts as its own due activity (CONTEXT.md).
+        facts
+            .filter { $0.day == day && $0.category == .care }
+            .map { DueAdherenceActivity(kind: .categoryDue, isCompleted: $0.isCompleted) }
+    }
 }
 
 /// The care module's contribution to one recorded history day.
@@ -52,9 +59,9 @@ struct CareHistoryDaySection: View {
     }
 
     var body: some View {
-        Section("Care") {
+        Section("Personal care") {
             if dayCare.isEmpty {
-                Text("No care routines due")
+                Text("No personal care routines due")
                     .foregroundStyle(.secondary)
             }
             ForEach(dayCare) { occurrence in

@@ -13,6 +13,10 @@ struct OnboardingView: View {
     @Query(sort: \CareRoutineTemplateRecord.notificationMinutes) private var routines: [CareRoutineTemplateRecord]
 
     @State private var step = 0
+    @State private var planChoice: PlanChoice?
+    @State private var trackNutrition = true
+    @State private var isInstallingExamplePlan = false
+    @State private var didInstallExamplePlan = false
     @State private var selectedWorkoutID: UUID?
     @State private var dueToday = true
     @State private var calorieTarget = "2400"
@@ -110,10 +114,15 @@ struct OnboardingView: View {
         case 0:
             welcomeStep
         case 1:
-            cycleStep
+            planChoiceStep
         default:
             settingsStep
         }
+    }
+
+    private enum PlanChoice {
+        case examplePlan
+        case buildOwn
     }
 
     private var welcomeStep: some View {
@@ -125,7 +134,7 @@ struct OnboardingView: View {
                     .font(.largeTitle.bold())
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("Momentum turns today’s obligations into a small, concrete sequence—workout, food, and care in one private place.")
+                Text("Momentum turns today’s obligations into a small, concrete sequence—workout, food, and personal care in one private place.")
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
@@ -142,6 +151,83 @@ struct OnboardingView: View {
                     detail: "Your routine starts on this device, with no account to create."
                 )
             }
+        }
+    }
+
+    @ViewBuilder
+    private var planChoiceStep: some View {
+        switch planChoice {
+        case .examplePlan:
+            cycleStep
+        case .buildOwn:
+            buildOwnConfirmation
+        case nil:
+            planChoiceCards
+        }
+    }
+
+    private var planChoiceCards: some View {
+        VStack(alignment: .leading, spacing: MomentumSpacing.lg) {
+            VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
+                Text("How do you want to start?")
+                    .font(.title.bold())
+
+                Text("Start from a complete example, or keep everything empty and build your own plans later in Plans.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                chooseExamplePlan()
+            } label: {
+                OnboardingChoiceCard(
+                    symbol: "sparkles",
+                    title: "Start from the example plan",
+                    detail: "Upper/Lower workout templates and personal care routines, ready to edit.",
+                    isSelected: false
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isInstallingExamplePlan)
+
+            if isInstallingExamplePlan {
+                ProgressView()
+                    .accessibilityLabel("Installing example plan")
+            }
+
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    planChoice = .buildOwn
+                }
+            } label: {
+                OnboardingChoiceCard(
+                    symbol: "square.and.pencil",
+                    title: "Build my own",
+                    detail: "Nothing is installed. Add your own plans whenever you are ready.",
+                    isSelected: false
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isInstallingExamplePlan)
+        }
+    }
+
+    private var buildOwnConfirmation: some View {
+        VStack(alignment: .leading, spacing: MomentumSpacing.lg) {
+            VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
+                Text("Starting empty")
+                    .font(.title.bold())
+
+                Text("Your plans stay empty for now. You can add workouts and personal care routines any time in Plans, or install the example plan later from Settings.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+
+            OnboardingBenefit(
+                symbol: "checkmark.circle",
+                title: "Hydration stays on",
+                detail: "Water tracking works out of the box; every other module can be enabled in Settings."
+            )
         }
     }
 
@@ -203,7 +289,7 @@ struct OnboardingView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
 
             VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-                Text("Your care plan")
+                Text("Your personal care plan")
                     .font(.title3.bold())
 
                 CarePreviewRow(
@@ -236,69 +322,83 @@ struct OnboardingView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if planChoice == .examplePlan {
+                VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
+                    Toggle(isOn: $dueToday) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(selectedWorkoutName) is due today")
+                                .font(.headline)
+                            Text("Turn this off to start your first day tomorrow.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(MomentumTheme.pulse)
+                }
+                .padding(MomentumSpacing.md)
+                .background(MomentumTheme.pulseWash)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+
             VStack(alignment: .leading, spacing: MomentumSpacing.sm) {
-                Toggle(isOn: $dueToday) {
+                Toggle(isOn: $trackNutrition) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(selectedWorkoutName) is due today")
+                        Text("Track nutrition")
                             .font(.headline)
-                        Text("Turn this off to start your first day tomorrow.")
+                        Text("Turn off to skip food logging for now. You can enable it later in Settings.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }
                 .tint(MomentumTheme.pulse)
-            }
-            .padding(MomentumSpacing.md)
-            .background(MomentumTheme.pulseWash)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
 
-            VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-                Text("Nutrition starting points")
-                    .font(.headline)
-
-                NutritionField(label: "Daily calories", value: $calorieTarget, suffix: "kcal")
-                HStack(spacing: MomentumSpacing.sm) {
-                    NutritionField(label: "Range from", value: $calorieMinimum, suffix: "kcal")
-                    NutritionField(label: "Range to", value: $calorieMaximum, suffix: "kcal")
-                }
-                NutritionField(label: "Protein minimum", value: $proteinMinimum, suffix: "g")
-
-                if !nutritionValidationMessages.isEmpty {
-                    VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
-                        ForEach(nutritionValidationMessages, id: \.self) { message in
-                            Label(message, systemImage: "exclamationmark.circle")
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                        }
+                if trackNutrition {
+                    NutritionField(label: "Daily calories", value: $calorieTarget, suffix: "kcal")
+                    HStack(spacing: MomentumSpacing.sm) {
+                        NutritionField(label: "Range from", value: $calorieMinimum, suffix: "kcal")
+                        NutritionField(label: "Range to", value: $calorieMaximum, suffix: "kcal")
                     }
-                    .accessibilityElement(children: .combine)
+                    NutritionField(label: "Protein minimum", value: $proteinMinimum, suffix: "g")
+
+                    if !nutritionValidationMessages.isEmpty {
+                        VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
+                            ForEach(nutritionValidationMessages, id: \.self) { message in
+                                Label(message, systemImage: "exclamationmark.circle")
+                                    .font(.footnote)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
                 }
             }
 
-            VStack(alignment: .leading, spacing: MomentumSpacing.md) {
-                VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
-                    Text("Care reminders")
-                        .font(.headline)
-                    Text("Choose times that fit your day. These reminders can be changed later.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
+            if planChoice == .examplePlan {
+                VStack(alignment: .leading, spacing: MomentumSpacing.md) {
+                    VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
+                        Text("Personal care reminders")
+                            .font(.headline)
+                        Text("Choose times that fit your day. These reminders can be changed later.")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
 
-                ReminderTimeField(
-                    label: "Hair care",
-                    detail: "When the alternating routine is due",
-                    minutes: $hairCareMinutes
-                )
-                ReminderTimeField(
-                    label: "Morning care",
-                    detail: "Daily",
-                    minutes: $morningCareMinutes
-                )
-                ReminderTimeField(
-                    label: "Night care",
-                    detail: "Daily routine for the current weekday",
-                    minutes: $nightCareMinutes
-                )
+                    ReminderTimeField(
+                        label: "Hair care",
+                        detail: "When the alternating routine is due",
+                        minutes: $hairCareMinutes
+                    )
+                    ReminderTimeField(
+                        label: "Morning care",
+                        detail: "Daily",
+                        minutes: $morningCareMinutes
+                    )
+                    ReminderTimeField(
+                        label: "Night care",
+                        detail: "Daily routine for the current weekday",
+                        minutes: $nightCareMinutes
+                    )
+                }
             }
 
             notificationPermissionSection
@@ -311,7 +411,7 @@ struct OnboardingView: View {
             Label("Reminders, only when useful", systemImage: "bell.badge")
                 .font(.headline)
 
-            Text("Momentum uses local reminders for care and a due workout. Denying permission never blocks the app.")
+            Text("Momentum uses local reminders for personal care and a due workout. Denying permission never blocks the app.")
                 .font(.body)
                 .foregroundStyle(.secondary)
 
@@ -376,25 +476,59 @@ struct OnboardingView: View {
         .controlSize(.large)
         .disabled(
             isFinishing ||
-            (step == 1 && selectedWorkoutID == nil) ||
-            (step == stepCount - 1 && !nutritionValidationMessages.isEmpty)
+            isInstallingExamplePlan ||
+            (step == 1 && !planChoiceIsComplete) ||
+            (step == stepCount - 1 && trackNutrition && !nutritionValidationMessages.isEmpty)
         )
         .accessibilityHint(step == stepCount - 1 ? "Completes onboarding" : "Moves to the next setup step")
+    }
+
+    private var planChoiceIsComplete: Bool {
+        switch planChoice {
+        case .buildOwn: true
+        case .examplePlan: selectedWorkoutID != nil
+        case nil: false
+        }
     }
 
     private var stepLabel: String {
         switch step {
         case 0: "A private system for the things you keep"
-        case 1: "The workout cycle"
+        case 1: "Your starting point"
         default: "Your starting points"
         }
     }
 
     private var buttonTitle: String {
         switch step {
-        case 0: "See the plan"
-        case 1: "Keep \(selectedWorkoutName) next"
-        default: "Start with \(selectedWorkoutName)"
+        case 0: "Get started"
+        case 1:
+            switch planChoice {
+            case .examplePlan: "Keep \(selectedWorkoutName) next"
+            default: "Continue"
+            }
+        default:
+            planChoice == .examplePlan ? "Start with \(selectedWorkoutName)" : "Start with Momentum"
+        }
+    }
+
+    private func chooseExamplePlan() {
+        guard !isInstallingExamplePlan else { return }
+        isInstallingExamplePlan = true
+        Task {
+            defer { isInstallingExamplePlan = false }
+            do {
+                try SeedData.install(in: modelContext)
+                hasPreparedDrafts = false
+                prepareDraftsIfNeeded()
+                selectedWorkoutID = workouts.first?.id
+                didInstallExamplePlan = true
+                withAnimation(.easeOut(duration: 0.2)) {
+                    planChoice = .examplePlan
+                }
+            } catch {
+                presentedAlert = .saveFailed
+            }
         }
     }
 
@@ -466,7 +600,7 @@ struct OnboardingView: View {
             notificationStatus = .authorized
             return
         }
-        await notificationScheduler.configureCategories()
+        NotificationScheduler.registerCategories()
         notificationStatus = await notificationScheduler.authorizationStatus()
     }
 
@@ -519,14 +653,14 @@ struct OnboardingView: View {
 
     private func completeOnboarding() async {
         guard
-            nutritionValidationMessages.isEmpty,
-            let selectedWorkoutID,
-            let calorieTarget = Int(calorieTarget),
-            let calorieMinimum = Int(calorieMinimum),
-            let calorieMaximum = Int(calorieMaximum),
-            let proteinMinimum = Int(proteinMinimum),
-            let settings = AppSettingsRecord.canonical(in: settings)
+            let settings = AppSettingsRecord.canonical(in: settings),
+            !(trackNutrition && !nutritionValidationMessages.isEmpty)
         else { return }
+        let selectedWorkoutID = planChoice == .examplePlan ? self.selectedWorkoutID : nil
+        let calorieTarget = Int(self.calorieTarget) ?? 0
+        let calorieMinimum = Int(self.calorieMinimum) ?? 0
+        let calorieMaximum = Int(self.calorieMaximum) ?? 0
+        let proteinMinimum = Int(self.proteinMinimum) ?? 0
 
         isFinishing = true
         defer { isFinishing = false }
@@ -535,7 +669,11 @@ struct OnboardingView: View {
             await requestNotificationPermission(showError: false)
         }
 
-        let originalSettings = (onboardingCompleted: settings.onboardingCompleted, updatedAt: settings.updatedAt)
+        let originalSettings = (
+            onboardingCompleted: settings.onboardingCompleted,
+            updatedAt: settings.updatedAt,
+            enabledModulesRaw: settings.enabledModulesRaw
+        )
         let anchor = anchors.max(by: { $0.updatedAt < $1.updatedAt })
         let originalAnchor = anchor.map {
             (nextWorkoutTemplateID: $0.nextWorkoutTemplateID, firstDueDomainDay: $0.firstDueDomainDay, updatedAt: $0.updatedAt)
@@ -550,13 +688,27 @@ struct OnboardingView: View {
             cutoffMinutes: settings.domainDayCutoffMinutes
         )
         let effectiveFrom = PersistedDomainDay.encode(currentDay)
-        let existingTarget = nutritionTargets.first { $0.effectiveFrom == effectiveFrom }
-        let priorOpenTarget = nutritionTargets
-            .filter { $0.id != existingTarget?.id && $0.effectiveTo == nil && $0.effectiveFrom < effectiveFrom }
-            .max { $0.effectiveFrom < $1.effectiveFrom }
+        let existingTarget = trackNutrition
+            ? nutritionTargets.first { $0.effectiveFrom == effectiveFrom }
+            : nil
+        let priorOpenTarget = trackNutrition
+            ? nutritionTargets
+                .filter { $0.id != existingTarget?.id && $0.effectiveTo == nil && $0.effectiveFrom < effectiveFrom }
+                .max { $0.effectiveFrom < $1.effectiveFrom }
+            : nil
         let originalPriorTargetEnd = priorOpenTarget?.effectiveTo
         let target = existingTarget ?? NutritionTargetRecord(effectiveFrom: effectiveFrom)
-        if existingTarget == nil {
+        // Snapshot for rollback when an existing target is edited in place.
+        let originalTargetValues = existingTarget.map {
+            (
+                display: $0.calorieDisplayTarget,
+                minimum: $0.calorieMinimum,
+                maximum: $0.calorieMaximum,
+                protein: $0.proteinMinimumGrams,
+                updatedAt: $0.updatedAt
+            )
+        }
+        if trackNutrition, existingTarget == nil {
             modelContext.insert(target)
         }
         if let priorOpenTarget {
@@ -567,31 +719,50 @@ struct OnboardingView: View {
         settings.onboardingCompleted = true
         settings.updatedAt = .now
 
-        target.calorieDisplayTarget = calorieTarget
-        target.calorieMinimum = calorieMinimum
-        target.calorieMaximum = calorieMaximum
-        target.proteinMinimumGrams = proteinMinimum
-        target.updatedAt = .now
+        // CONTEXT.md module inference (pre-launch spec §4): hydration is
+        // always on; workout follows a confirmed cycle starting point;
+        // nutrition follows an accepted target; care follows the example
+        // plan. Skipped steps mean the module ships disabled.
+        var enabledIDs: Set<ModuleID> = [BuiltInModuleID.hydration]
+        if selectedWorkoutID != nil { enabledIDs.insert(BuiltInModuleID.workout) }
+        if trackNutrition { enabledIDs.insert(BuiltInModuleID.nutrition) }
+        // Spec §4: care is enabled only by the example plan or an explicitly
+        // kept/set reminder time; the build-own path shows no care pickers,
+        // so it stays off there.
+        if planChoice == .examplePlan {
+            enabledIDs.insert(BuiltInModuleID.care)
+        }
+        ModuleEnablementStore.apply(enabledIDs, to: settings)
 
-        if let anchor {
+        if trackNutrition {
+            target.calorieDisplayTarget = calorieTarget
+            target.calorieMinimum = calorieMinimum
+            target.calorieMaximum = calorieMaximum
+            target.proteinMinimumGrams = proteinMinimum
+            target.updatedAt = .now
+        }
+
+        if let selectedWorkoutID, let anchor {
             let dueDay = dueToday ? currentDay : currentDay.adding(days: 1, calendar: calendar)
             anchor.nextWorkoutTemplateID = selectedWorkoutID
             anchor.firstDueDomainDay = encode(dueDay)
             anchor.updatedAt = .now
         }
 
-        for routine in routines {
-            switch routine.name {
-            case "Hair care":
-                routine.notificationMinutes = hairCareMinutes
-            case "Morning care":
-                routine.notificationMinutes = morningCareMinutes
-            case let name where name.hasPrefix("Night care"):
-                routine.notificationMinutes = nightCareMinutes
-            default:
-                continue
+        if planChoice == .examplePlan {
+            for routine in routines {
+                switch routine.name {
+                case "Hair care":
+                    routine.notificationMinutes = hairCareMinutes
+                case "Morning care":
+                    routine.notificationMinutes = morningCareMinutes
+                case let name where name.hasPrefix("Night care"):
+                    routine.notificationMinutes = nightCareMinutes
+                default:
+                    continue
+                }
+                routine.updatedAt = .now
             }
-            routine.updatedAt = .now
         }
 
         do {
@@ -599,8 +770,16 @@ struct OnboardingView: View {
         } catch {
             settings.onboardingCompleted = originalSettings.onboardingCompleted
             settings.updatedAt = originalSettings.updatedAt
-            if existingTarget == nil {
+            settings.enabledModulesRaw = originalSettings.enabledModulesRaw
+            if trackNutrition, existingTarget == nil {
                 modelContext.delete(target)
+            }
+            if let originalTargetValues, let existingTarget {
+                existingTarget.calorieDisplayTarget = originalTargetValues.display
+                existingTarget.calorieMinimum = originalTargetValues.minimum
+                existingTarget.calorieMaximum = originalTargetValues.maximum
+                existingTarget.proteinMinimumGrams = originalTargetValues.protein
+                existingTarget.updatedAt = originalTargetValues.updatedAt
             }
             priorOpenTarget?.effectiveTo = originalPriorTargetEnd
             if let anchor, let originalAnchor {
@@ -613,6 +792,17 @@ struct OnboardingView: View {
                 original.record.updatedAt = original.updatedAt
             }
             presentedAlert = .saveFailed
+
+            // The example plan was already persisted by its own installation
+            // save; a failed completion must restore empty-by-default and put
+            // the owner back on the plan-choice step.
+            if didInstallExamplePlan {
+                try? SeedData.uninstallExamplePlan(in: modelContext)
+                didInstallExamplePlan = false
+                self.selectedWorkoutID = nil
+                planChoice = nil
+                step = 1
+            }
         }
     }
 
@@ -779,6 +969,38 @@ private struct NutritionField: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct OnboardingChoiceCard: View {
+    let symbol: String
+    let title: String
+    let detail: String
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: MomentumSpacing.md) {
+            Image(systemName: symbol)
+                .font(.headline)
+                .foregroundStyle(MomentumTheme.pulse)
+                .frame(width: 32, height: 32)
+                .background(MomentumTheme.pulseWash)
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text(detail)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(MomentumSpacing.md)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .combine)
     }
 }
 

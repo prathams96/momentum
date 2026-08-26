@@ -70,7 +70,7 @@ struct CareRoutineSheet: View {
                     ContentUnavailableView("Routine unavailable", systemImage: "exclamationmark.triangle")
                 }
             }
-            .navigationTitle(occurrence?.routineNameSnapshot ?? "Care routine")
+            .navigationTitle(occurrence?.routineNameSnapshot ?? "Personal care routine")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

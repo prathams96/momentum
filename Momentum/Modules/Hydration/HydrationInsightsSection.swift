@@ -28,7 +28,12 @@ struct HydrationInsightsSection: View {
             } else {
                 LabeledContent(
                     "Average daily intake",
-                    value: HydrationVolumeFormatting.volume(projection.averageDailyML)
+                    value: HydrationVolumeFormatting.volume(
+                        projection.averageDailyML,
+                        unitSystem: UnitSystemOption(
+                            rawValue: AppSettingsRecord.canonical(in: settings)?.unitSystemRaw ?? "metric"
+                        ) ?? .metric
+                    )
                 )
                 LabeledContent(
                     "Days target reached",

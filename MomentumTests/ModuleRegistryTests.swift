@@ -55,7 +55,10 @@ final class ModuleRegistryTests: XCTestCase {
         XCTAssertEqual(ModuleEnablementStore.enabledIDs(from: settings), enabled)
 
         settings.enabledModulesRaw = ""
-        XCTAssertEqual(ModuleEnablementStore.enabledIDs(from: settings), ModuleRegistry.defaultEnabledIDs)
+        XCTAssertEqual(ModuleEnablementStore.enabledIDs(from: settings), [])
+
+        settings.enabledModulesRaw = "workout"
+        XCTAssertEqual(ModuleEnablementStore.enabledIDs(from: settings), [BuiltInModuleID.workout])
 
         XCTAssertEqual(ModuleEnablementStore.enabledIDs(from: nil), ModuleRegistry.defaultEnabledIDs)
     }

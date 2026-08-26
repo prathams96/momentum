@@ -45,7 +45,7 @@ struct HydrationHistoryDaySection: View {
         Section("Hydration") {
             LabeledContent(
                 "Day total",
-                value: "\(HydrationVolumeFormatting.volume(totalML)) of \(HydrationVolumeFormatting.volume(targetML))"
+                value: "\(HydrationVolumeFormatting.volume(totalML, unitSystem: unitSystem)) of \(HydrationVolumeFormatting.volume(targetML, unitSystem: unitSystem))"
             )
             Label(
                 totalML >= targetML ? "Target reached" : "Target not reached",
@@ -63,7 +63,7 @@ struct HydrationHistoryDaySection: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(HydrationVolumeFormatting.volume(entry.amountML))
+                        Text(HydrationVolumeFormatting.volume(entry.amountML, unitSystem: unitSystem))
                             .monospacedDigit()
                     }
                     .accessibilityElement(children: .combine)
@@ -176,7 +176,11 @@ private struct HydrationHistoryEditSheet: View {
     }
 
     private func load() {
-        amount = Double(entry.amountML)
+        // The field displays the entry in the active unit system; storage
+        // stays millilitre-canonical either way.
+        amount = unitSystem == .imperial
+            ? HydrationEngine.exactFluidOunces(fromML: entry.amountML)
+            : Double(entry.amountML)
         consumedAt = entry.consumedAt
     }
 
@@ -186,7 +190,7 @@ private struct HydrationHistoryEditSheet: View {
         case .metric:
             amountML = Int(amount.rounded())
         case .imperial:
-            amountML = HydrationEngine.millilitres(fromFluidOunces: Int(amount.rounded()))
+            amountML = HydrationEngine.millilitres(fromExactFluidOunces: amount)
         }
         guard amountML > 0 else {
             saveError = "Enter an amount greater than zero."
@@ -259,5 +263,14 @@ extension HydrationModuleAdapter: HistoryContributing {
             .filter { !recordedDays.contains($0) }
             .map { HydrationAdherenceDay(day: $0, isTargetReached: false, isPaused: true) }
         return engine.hydrationStreak(days: adherenceDays, calendar: context.calendar)
+    }
+
+    func adherenceActivities(on day: DomainDay, facts: [HistoryAdherenceFact]) -> [DueAdherenceActivity] {
+        let matching = facts.filter { $0.day == day && $0.category == .hydration }
+        guard !matching.isEmpty else { return [] }
+        return [DueAdherenceActivity(
+            kind: .hydration,
+            isCompleted: matching.contains(where: \.isCompleted)
+        )]
     }
 }

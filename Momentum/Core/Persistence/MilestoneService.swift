@@ -2,6 +2,9 @@ import Foundation
 import MomentumCore
 import SwiftData
 
+/// Milestones are a Core projection over module-emitted facts
+/// (`MilestoneContributing`): Core owns thresholds, keys, and lifecycle but
+/// never reaches into module schema.
 @MainActor
 enum MilestoneService {
     static let workoutCountKind = "workoutCount"
@@ -25,16 +28,24 @@ enum MilestoneService {
     static func reconcile(
         in context: ModelContext,
         now: Date = .now,
-        calendar: Calendar = .autoupdatingCurrent
+        calendar: Calendar = .autoupdatingCurrent,
+        registry: ModuleRegistry = .standard
     ) throws {
+        let settings = AppSettingsRecord.canonical(
+            in: try context.fetch(FetchDescriptor<AppSettingsRecord>())
+        )
+        let moduleContext = ModuleContext.make(
+            in: context,
+            settings: settings,
+            now: now,
+            calendar: calendar
+        )
+        let contributors = registry
+            .enabledModules(ModuleEnablementStore.enabledIDs(from: settings))
+            .compactMap { $0 as? any MilestoneContributing }
+
         let candidates = makeCandidates(
-            sessions: try context.fetch(FetchDescriptor<WorkoutSessionRecord>()),
-            exerciseLogs: try context.fetch(FetchDescriptor<ExerciseLogRecord>()),
-            setLogs: try context.fetch(FetchDescriptor<SetLogRecord>()),
-            workoutEvents: try context.fetch(FetchDescriptor<WorkoutDayEventRecord>()),
-            nutritionDays: try context.fetch(FetchDescriptor<NutritionDayRecord>()),
-            foodEntries: try context.fetch(FetchDescriptor<FoodEntryRecord>()),
-            careOccurrences: try context.fetch(FetchDescriptor<CareOccurrenceRecord>()),
+            facts: contributors.flatMap { $0.milestoneFacts(in: moduleContext) },
             calendar: calendar
         )
         let candidateKeys = Set(candidates.map(\.key))
@@ -122,8 +133,8 @@ enum MilestoneService {
             )
         case careStreakKind:
             return MilestonePresentation(
-                title: "Care consistency",
-                message: "All due care was completed for a record \(count) consecutive Domain Days.",
+                title: "Personal care consistency",
+                message: "All due personal care was completed for a record \(count) consecutive Domain Days.",
                 symbol: "sparkles"
             )
         case exerciseWeightBestKind:
@@ -149,120 +160,106 @@ enum MilestoneService {
         }
     }
 
+    // MARK: - Candidate projection over emitted facts
+
     private static func makeCandidates(
-        sessions: [WorkoutSessionRecord],
-        exerciseLogs: [ExerciseLogRecord],
-        setLogs: [SetLogRecord],
-        workoutEvents: [WorkoutDayEventRecord],
-        nutritionDays: [NutritionDayRecord],
-        foodEntries: [FoodEntryRecord],
-        careOccurrences: [CareOccurrenceRecord],
+        facts: [MilestoneFact],
         calendar: Calendar
     ) -> [MilestoneCandidate] {
-        let completedSessions = sessions.filter { $0.finishedAt != nil && $0.deletedAt == nil }.sorted {
-            (($0.finishedAt ?? .distantPast), $0.id.uuidString) < (($1.finishedAt ?? .distantPast), $1.id.uuidString)
-        }
         var result = [MilestoneCandidate]()
 
-        for threshold in [10, 25, 50] where completedSessions.count >= threshold {
+        let completions = facts.compactMap { fact -> Date? in
+            if case let .workoutCompleted(at) = fact { return at }
+            return nil
+        }.sorted()
+        for threshold in [10, 25, 50] where completions.count >= threshold {
             result.append(MilestoneCandidate(
                 kind: workoutCountKind,
                 threshold: Double(threshold),
                 relatedEntityID: nil,
-                earnedAt: completedSessions[threshold - 1].finishedAt ?? completedSessions[threshold - 1].startedAt
+                earnedAt: completions[threshold - 1]
             ))
         }
 
-        let workoutRecord = longestWorkoutStreak(sessions: completedSessions, events: workoutEvents)
-        if workoutRecord.count >= 2 {
+        let timeline: [(date: Date, completed: Bool)] =
+            completions.map { ($0, true) } +
+            facts.compactMap { fact -> (Date, Bool)? in
+                if case let .workoutOpportunityMissed(at) = fact { return (at, false) }
+                return nil
+            }
+        var current = 0
+        var record = 0
+        var recordEarnedAt = Date.distantPast
+        for fact in timeline.sorted(by: { ($0.date, $0.completed ? 1 : 0) < ($1.date, $1.completed ? 1 : 0) }) {
+            current = fact.completed ? current + 1 : 0
+            if current > record { record = current; recordEarnedAt = fact.date }
+        }
+        if record >= 2 {
             result.append(MilestoneCandidate(
                 kind: workoutStreakKind,
-                threshold: Double(workoutRecord.count),
+                threshold: Double(record),
                 relatedEntityID: nil,
-                earnedAt: workoutRecord.earnedAt
+                earnedAt: recordEarnedAt
             ))
         }
 
-        let nutritionLoggingRecord = longestConsecutiveDays(
-            nutritionDays.filter { $0.finalizedAt != nil }.compactMap { record in
-                PersistedDomainDay.decode(record.domainDay).map { day in
-                    StreakFact(day: day, completed: true, earnedAt: record.finalizedAt ?? record.updatedAt)
+        result.append(contentsOf: streakCandidates(
+            loggingDays: facts.compactMap { fact -> StreakFact? in
+                if case let .nutritionDayFinalized(day, finalizedAt, _, _, _, _, _) = fact {
+                    return StreakFact(day: day, completed: true, earnedAt: finalizedAt)
                 }
+                return nil
             },
+            kind: nutritionLoggingStreakKind,
             calendar: calendar
-        )
-        if nutritionLoggingRecord.count >= 2 {
-            result.append(MilestoneCandidate(
-                kind: nutritionLoggingStreakKind,
-                threshold: Double(nutritionLoggingRecord.count),
-                relatedEntityID: nil,
-                earnedAt: nutritionLoggingRecord.earnedAt
-            ))
-        }
-
-        let careFacts = Dictionary(
-            grouping: careOccurrences.filter { $0.statusRaw != "repairedDuplicate" },
-            by: \.dueDomainDay
-        ).compactMap { dayValue, occurrences -> StreakFact? in
-            guard let day = PersistedDomainDay.decode(dayValue) else { return nil }
-            return StreakFact(
-                day: day,
-                completed: occurrences.allSatisfy { $0.statusRaw == "completed" },
-                earnedAt: occurrences.compactMap(\.completedAt).max() ?? occurrences.map(\.updatedAt).max() ?? .distantPast
-            )
-        }
-        let careRecord = longestConsecutiveDays(careFacts, calendar: calendar)
-        if careRecord.count >= 2 {
-            result.append(MilestoneCandidate(
-                kind: careStreakKind,
-                threshold: Double(careRecord.count),
-                relatedEntityID: nil,
-                earnedAt: careRecord.earnedAt
-            ))
-        }
-
-        result.append(contentsOf: exerciseCandidates(
-            sessions: completedSessions,
-            exerciseLogs: exerciseLogs,
-            setLogs: setLogs
         ))
 
-        let nutritionRangeRecord = longestConsecutiveDays(
-            nutritionRangeFacts(
-                days: nutritionDays,
-                entries: foodEntries
-            ),
+        result.append(contentsOf: streakCandidates(
+            loggingDays: facts.compactMap { fact -> StreakFact? in
+                if case let .personalCareDay(day, isFullyCompleted, lastActivityAt) = fact {
+                    return StreakFact(day: day, completed: isFullyCompleted, earnedAt: lastActivityAt)
+                }
+                return nil
+            },
+            kind: careStreakKind,
             calendar: calendar
-        )
-        if nutritionRangeRecord.count >= 2 {
-            result.append(MilestoneCandidate(
-                kind: nutritionRangeStreakKind,
-                threshold: Double(nutritionRangeRecord.count),
-                relatedEntityID: nil,
-                earnedAt: nutritionRangeRecord.earnedAt
-            ))
-        }
+        ))
+
+        result.append(contentsOf: exerciseCandidates(performanceFacts: facts))
+
+        result.append(contentsOf: streakCandidates(
+            loggingDays: facts.compactMap { fact -> StreakFact? in
+                if case let .nutritionDayFinalized(day, finalizedAt, calorieMinimum, calorieMaximum, proteinMinimum, calories, protein) = fact {
+                    return StreakFact(
+                        day: day,
+                        completed: calories >= Double(calorieMinimum)
+                            && calories <= Double(calorieMaximum)
+                            && protein >= Double(proteinMinimum),
+                        earnedAt: finalizedAt
+                    )
+                }
+                return nil
+            },
+            kind: nutritionRangeStreakKind,
+            calendar: calendar
+        ))
 
         return result
     }
 
-    private static func longestWorkoutStreak(
-        sessions: [WorkoutSessionRecord],
-        events: [WorkoutDayEventRecord]
-    ) -> (count: Int, earnedAt: Date) {
-        let facts: [(date: Date, completed: Bool)] = sessions.map {
-            ($0.finishedAt ?? $0.startedAt, true)
-        } + events.filter { $0.deletedAt == nil }.map {
-            ($0.createdAt, false)
-        }
-        var current = 0
-        var record = 0
-        var earnedAt = Date.distantPast
-        for fact in facts.sorted(by: { ($0.date, $0.completed ? 1 : 0) < ($1.date, $1.completed ? 1 : 0) }) {
-            current = fact.completed ? current + 1 : 0
-            if current > record { record = current; earnedAt = fact.date }
-        }
-        return (record, earnedAt)
+    private static func streakCandidates(
+        loggingDays days: [StreakFact],
+        kind: String,
+        calendar: Calendar
+    ) -> [MilestoneCandidate] {
+        let dayRecord = longestConsecutiveDays(days, calendar: calendar)
+        guard dayRecord.count >= 2 else { return [] }
+        return [MilestoneCandidate(
+            kind: kind,
+            threshold: Double(dayRecord.count),
+            relatedEntityID: nil,
+            earnedAt: dayRecord.earnedAt
+        )]
     }
 
     private static func longestConsecutiveDays(
@@ -286,70 +283,52 @@ enum MilestoneService {
     }
 
     private static func exerciseCandidates(
-        sessions: [WorkoutSessionRecord],
-        exerciseLogs: [ExerciseLogRecord],
-        setLogs: [SetLogRecord]
+        performanceFacts facts: [MilestoneFact]
     ) -> [MilestoneCandidate] {
-        let sessionsByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
-        let setsByLog = Dictionary(grouping: setLogs.filter { $0.statusRaw == "completed" }, by: \.exerciseLogID)
-        var candidates = [MilestoneCandidate]()
-        for (prescriptionID, logs) in Dictionary(
-            grouping: exerciseLogs.filter { $0.prescriptionID != nil && $0.statusRaw == "completed" },
-            by: { $0.prescriptionID! }
-        ) {
-            let performances = logs.flatMap { log -> [(SetLogRecord, Date)] in
-                guard let session = sessionsByID[log.workoutSessionID] else { return [] }
-                return (setsByLog[log.id] ?? []).map { ($0, session.finishedAt ?? session.startedAt) }
-            }
-            guard !performances.isEmpty else { continue }
+        struct Performance {
+            let prescriptionID: UUID
+            let weightKg: Double
+            let repetitions: Int
+            let at: Date
+        }
 
+        var candidates = [MilestoneCandidate]()
+        for (prescriptionID, performances) in Dictionary(
+            grouping: facts.compactMap { fact -> Performance? in
+                if case let .exercisePerformance(id, weightKg, repetitions, at) = fact {
+                    return Performance(
+                        prescriptionID: id,
+                        weightKg: weightKg,
+                        repetitions: repetitions,
+                        at: at
+                    )
+                }
+                return nil
+            },
+            by: \.prescriptionID
+        ) {
             if let weightBest = performances.max(by: {
-                ($0.0.weightKg, $0.0.repetitions, $0.1) < ($1.0.weightKg, $1.0.repetitions, $1.1)
-            }), weightBest.0.weightKg > 0 {
+                ($0.weightKg, $0.repetitions, $0.at) < ($1.weightKg, $1.repetitions, $1.at)
+            }), weightBest.weightKg > 0 {
                 candidates.append(MilestoneCandidate(
                     kind: exerciseWeightBestKind,
-                    threshold: weightBest.0.weightKg,
+                    threshold: weightBest.weightKg,
                     relatedEntityID: prescriptionID,
-                    earnedAt: weightBest.1
+                    earnedAt: weightBest.at
                 ))
             }
             if let repetitionBest = performances.max(by: {
-                ($0.0.repetitions, $0.0.weightKg, $0.1) < ($1.0.repetitions, $1.0.weightKg, $1.1)
-            }), repetitionBest.0.repetitions > 0 {
+                ($0.repetitions, $0.weightKg, $0.at) < ($1.repetitions, $1.weightKg, $1.at)
+            }), repetitionBest.repetitions > 0 {
                 candidates.append(MilestoneCandidate(
                     kind: exerciseRepetitionBestKind,
-                    threshold: Double(repetitionBest.0.repetitions),
+                    threshold: Double(repetitionBest.repetitions),
                     relatedEntityID: prescriptionID,
-                    earnedAt: repetitionBest.1
+                    earnedAt: repetitionBest.at
                 ))
             }
         }
         return candidates
-    }
-
-    private static func nutritionRangeFacts(
-        days: [NutritionDayRecord],
-        entries: [FoodEntryRecord]
-    ) -> [StreakFact] {
-        let entriesByDay = Dictionary(grouping: entries.filter { $0.deletedAt == nil }, by: \.domainDay)
-        return days.compactMap { record in
-            guard let finalizedAt = record.finalizedAt,
-                  let day = PersistedDomainDay.decode(record.domainDay) else { return nil }
-            let minimum = record.calorieMinimumSnapshot
-            let maximum = record.calorieMaximumSnapshot
-            let proteinMinimum = record.proteinMinimumSnapshot
-            let totals = (entriesByDay[record.domainDay] ?? []).reduce(into: (calories: 0.0, protein: 0.0)) {
-                $0.calories += $1.totalCalories
-                $0.protein += $1.totalProteinGrams
-            }
-            return StreakFact(
-                day: day,
-                completed: totals.calories >= Double(minimum) &&
-                    totals.calories <= Double(maximum) &&
-                    totals.protein >= Double(proteinMinimum),
-                earnedAt: finalizedAt
-            )
-        }
     }
 }
 
@@ -367,7 +346,7 @@ private struct MilestoneCandidate {
     var key: MilestoneKey { MilestoneKey(kind: kind, threshold: threshold, relatedEntityID: relatedEntityID) }
 }
 
-private struct MilestoneKey: Hashable {
+struct MilestoneKey: Hashable {
     let kind: String
     let threshold: Double?
     let relatedEntityID: UUID?

@@ -67,7 +67,7 @@ struct HydrationTodaySection: View {
                 .font(.title3.bold())
 
             VStack(alignment: .leading, spacing: MomentumSpacing.xs) {
-                Text("\(HydrationVolumeFormatting.volume(consumedML)) of \(HydrationVolumeFormatting.volume(targetML))")
+                Text("\(HydrationVolumeFormatting.volume(consumedML, unitSystem: unitSystem)) of \(HydrationVolumeFormatting.volume(targetML, unitSystem: unitSystem))")
                     .font(.headline.monospacedDigit())
 
                 GeometryReader { proxy in
@@ -146,17 +146,17 @@ struct HydrationTodaySection: View {
     }
 
     private var accessibilitySummary: String {
-        "Hydration. \(HydrationVolumeFormatting.litres(consumedML)) litres of \(HydrationVolumeFormatting.litres(targetML)) litre daily target. \(HydrationVolumeFormatting.percentage(of: consumedML, targetML: targetML)) percent."
+        "Hydration. \(HydrationVolumeFormatting.volume(consumedML, unitSystem: unitSystem)) of \(HydrationVolumeFormatting.volume(targetML, unitSystem: unitSystem)) daily target. \(HydrationVolumeFormatting.percentage(of: consumedML, targetML: targetML)) percent."
     }
 
     private func presetLabel(_ amountML: Int) -> String {
         guard unitSystem == .imperial else { return "\(amountML) ml" }
-        return "\(HydrationEngine.fluidOunces(fromML: amountML)) fl oz"
+        return "\(HydrationEngine.fluidOuncesDisplay(fromML: amountML)) fl oz"
     }
 
     private func presetAccessibilityLabel(_ amountML: Int) -> String {
         guard unitSystem == .imperial else { return "Add \(amountML) millilitres" }
-        return "Add \(HydrationEngine.fluidOunces(fromML: amountML)) fluid ounces"
+        return "Add \(HydrationEngine.fluidOuncesDisplay(fromML: amountML)) fluid ounces"
     }
 
     private func fillWidth(in width: CGFloat) -> CGFloat {
@@ -251,7 +251,7 @@ struct HydrationCustomAmountSheet: View {
         case .metric:
             amountML = Int(amount.rounded())
         case .imperial:
-            amountML = HydrationEngine.millilitres(fromFluidOunces: Int(amount.rounded()))
+            amountML = HydrationEngine.millilitres(fromExactFluidOunces: amount)
         }
         guard amountML > 0 else {
             saveError = "Enter an amount greater than zero."
@@ -302,7 +302,10 @@ extension HydrationModuleAdapter: TodayContributing {
         return TodayContribution(
             metadata: metadata,
             state: state,
-            accessibilitySummary: "Hydration. \(HydrationVolumeFormatting.litres(total)) litres of \(HydrationVolumeFormatting.litres(targetML)) litre daily target. \(HydrationVolumeFormatting.percentage(of: total, targetML: targetML)) percent."
+            accessibilitySummary: {
+            let unit = UnitSystemOption(rawValue: context.unitSystemRaw) ?? .metric
+            return "Hydration. \(HydrationVolumeFormatting.volume(total, unitSystem: unit)) of \(HydrationVolumeFormatting.volume(targetML, unitSystem: unit)) daily target. \(HydrationVolumeFormatting.percentage(of: total, targetML: targetML)) percent."
+        }()
         )
     }
 

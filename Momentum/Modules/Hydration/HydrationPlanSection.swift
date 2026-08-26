@@ -49,10 +49,10 @@ struct HydrationPlanSection: View {
                 Stepper("Second preset: \(secondPresetML) ml", value: $secondPresetML, in: 50...2_000, step: 50)
                 Stepper("Third preset: \(thirdPresetML) ml", value: $thirdPresetML, in: 50...2_000, step: 50)
             } else {
-                Stepper("Daily target: \(HydrationEngine.fluidOunces(fromML: targetML)) fl oz", value: targetOunces, in: 17...338, step: 1)
-                Stepper("First preset: \(HydrationEngine.fluidOunces(fromML: firstPresetML)) fl oz", value: firstPresetOunces, in: 2...68, step: 1)
-                Stepper("Second preset: \(HydrationEngine.fluidOunces(fromML: secondPresetML)) fl oz", value: secondPresetOunces, in: 2...68, step: 1)
-                Stepper("Third preset: \(HydrationEngine.fluidOunces(fromML: thirdPresetML)) fl oz", value: thirdPresetOunces, in: 2...68, step: 1)
+                Stepper("Daily target: \(HydrationEngine.fluidOuncesDisplay(fromML: targetML)) fl oz", value: targetOunces, in: 17...338, step: 1)
+                Stepper("First preset: \(HydrationEngine.fluidOuncesDisplay(fromML: firstPresetML)) fl oz", value: firstPresetOunces, in: 2...68, step: 1)
+                Stepper("Second preset: \(HydrationEngine.fluidOuncesDisplay(fromML: secondPresetML)) fl oz", value: secondPresetOunces, in: 2...68, step: 1)
+                Stepper("Third preset: \(HydrationEngine.fluidOuncesDisplay(fromML: thirdPresetML)) fl oz", value: thirdPresetOunces, in: 2...68, step: 1)
             }
 
             Toggle("Reminders", isOn: $remindersEnabled)

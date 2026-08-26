@@ -59,10 +59,14 @@ enum ModuleEnablementLedger {
             case (true, nil):
                 // First sighting ever: cover from forever so upgrade installs
                 // keep their existing streaks unbroken. Re-enablements instead
-                // anchor to the actual day.
+                // anchor to the day AFTER the toggle: the streak resumes the
+                // day after re-enable (spec §2), so the toggle day itself
+                // stays paused.
                 let fromValue = moduleRecords.isEmpty
                     ? ""
-                    : PersistedDomainDay.encode(currentDay)
+                    : PersistedDomainDay.encode(
+                        currentDay.adding(days: 1, calendar: .autoupdatingCurrent)
+                    )
                 context.insert(ModuleActivationIntervalRecord(
                     moduleIDRaw: id.rawValue,
                     enabledFromDomainDay: fromValue

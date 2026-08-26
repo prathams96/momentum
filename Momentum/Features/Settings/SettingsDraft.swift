@@ -8,6 +8,7 @@ struct SettingsDraft: Equatable {
     var workoutNotificationMinutes: Int
     var nutritionReminderMinutes: Int
     var routineReminders: [RoutineReminderDraft]
+    var enabledModuleIDs: Set<ModuleID>
 
     @MainActor
     init(settings: AppSettingsRecord, routines: [CareRoutineTemplateRecord]) {
@@ -20,15 +21,18 @@ struct SettingsDraft: Equatable {
             .filter { !$0.isArchived }
             .map { RoutineReminderDraft(id: $0.id, name: $0.name, minutes: Self.validMinutes($0.notificationMinutes)) }
             .sorted { ($0.minutes, $0.name, $0.id.uuidString) < ($1.minutes, $1.name, $1.id.uuidString) }
+        enabledModuleIDs = ModuleEnablementStore.enabledIDs(from: settings)
     }
 
+    @MainActor
     static let fallback = SettingsDraft(
         domainDayCutoffMinutes: 180,
         unitSystemRaw: "metric",
         selectedAppearanceRaw: "system",
         workoutNotificationMinutes: 18 * 60 + 30,
         nutritionReminderMinutes: 22 * 60,
-        routineReminders: []
+        routineReminders: [],
+        enabledModuleIDs: ModuleRegistry.defaultEnabledIDs
     )
 
     init(
@@ -37,7 +41,8 @@ struct SettingsDraft: Equatable {
         selectedAppearanceRaw: String,
         workoutNotificationMinutes: Int,
         nutritionReminderMinutes: Int,
-        routineReminders: [RoutineReminderDraft]
+        routineReminders: [RoutineReminderDraft],
+        enabledModuleIDs: Set<ModuleID>
     ) {
         self.domainDayCutoffMinutes = domainDayCutoffMinutes
         self.unitSystemRaw = unitSystemRaw
@@ -45,6 +50,7 @@ struct SettingsDraft: Equatable {
         self.workoutNotificationMinutes = workoutNotificationMinutes
         self.nutritionReminderMinutes = nutritionReminderMinutes
         self.routineReminders = routineReminders
+        self.enabledModuleIDs = enabledModuleIDs
     }
 
     @MainActor
@@ -54,6 +60,7 @@ struct SettingsDraft: Equatable {
         settings.selectedAppearanceRaw = selectedAppearanceRaw
         settings.workoutNotificationMinutes = workoutNotificationMinutes
         settings.nutritionReminderMinutes = nutritionReminderMinutes
+        ModuleEnablementStore.apply(enabledModuleIDs, to: settings)
         settings.updatedAt = now
 
         let minutesByID = Dictionary(uniqueKeysWithValues: routineReminders.map { ($0.id, $0.minutes) })

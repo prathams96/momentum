@@ -12,11 +12,13 @@ enum ModuleEnablementStore {
 
     static func enabledIDs(from settings: AppSettingsRecord?) -> Set<ModuleID> {
         guard let settings else { return ModuleRegistry.defaultEnabledIDs }
+        // An explicit empty list means every module is off; only a missing
+        // settings record falls back to ship-default enablement.
         let ids = settings.enabledModulesRaw
             .split(separator: ",")
             .map { ModuleID($0.trimmingCharacters(in: .whitespaces)) }
             .filter { !$0.rawValue.isEmpty }
-        return ids.isEmpty ? ModuleRegistry.defaultEnabledIDs : Set(ids)
+        return Set(ids)
     }
 
     static func apply(_ ids: Set<ModuleID>, to settings: AppSettingsRecord) {
