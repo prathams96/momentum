@@ -61,6 +61,7 @@
 		765BCAB17AA5B99EE01D2019 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 857DFAAE6EF601435BFA75EC /* SettingsView.swift */; };
 		766E16E4549B20247762925D /* HistoryCorrectionTransactionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F018DDCE60EAD0942DEEBA9A /* HistoryCorrectionTransactionTests.swift */; };
 		79CA5FFC5C0D53D21E3E029E /* NutritionPlanSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4BF09EB5ED5CABD36B134E /* NutritionPlanSection.swift */; };
+		7CE5026E959B28B214AA1CC2 /* ModuleSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF23B33845A64667FDE09325 /* ModuleSetup.swift */; };
 		7D266F79539CB07F450A2D7A /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACE83CB0C4A93124D0ECF85 /* NotificationScheduler.swift */; };
 		7DBA010A35B4FA8411CF8DBC /* HistoryProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8320054811E8FBF7C5B09A /* HistoryProjectionTests.swift */; };
 		7FFDA75AAA885F0B7E6D2169 /* StreakPauseLedgerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67CE1FA1A7EAB2331CA848FC /* StreakPauseLedgerTests.swift */; };
@@ -76,6 +77,7 @@
 		93CF080CC4587919A6C24D4D /* MomentumApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB577315C556F0E9D1FE31D7 /* MomentumApp.swift */; };
 		948C636D3396FCC1FA34099E /* CarePlanSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF9B1BE75423E9DB9F3AC57 /* CarePlanSection.swift */; };
 		95A0BC0AE2C5B2788A43D276 /* NutritionTodaySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F95D448046A320D163B1F6B /* NutritionTodaySection.swift */; };
+		9A2B004D742757D442F593DA /* EveningMergeFallbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83AFF36044D82F8EF459FEE3 /* EveningMergeFallbackTests.swift */; };
 		9BFEC4AB2BE6A0342919C2CE /* PlanServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F069EA5615525C33194C090 /* PlanServices.swift */; };
 		9EEDE5465DB1A4EA27B1C454 /* CareReminderCandidates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9807A573C5811141592C861 /* CareReminderCandidates.swift */; };
 		A78D0CB7A010AA042E49F88F /* NutritionMilestoneFacts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E2D965321A429DEA9010338 /* NutritionMilestoneFacts.swift */; };
@@ -188,6 +190,7 @@
 		7F5EC785C413FA6B001B2115 /* ModuleMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleMetadata.swift; sourceTree = "<group>"; };
 		82AE02D0BD601BA8C5FDEDFE /* ModuleContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleContext.swift; sourceTree = "<group>"; };
 		8301A45E79F89C480AD1D89F /* ResetAllDataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetAllDataService.swift; sourceTree = "<group>"; };
+		83AFF36044D82F8EF459FEE3 /* EveningMergeFallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EveningMergeFallbackTests.swift; sourceTree = "<group>"; };
 		83EC215B2518165EAFA29883 /* WorkoutReminderCandidates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutReminderCandidates.swift; sourceTree = "<group>"; };
 		84BF7C2AB11F3A670B6DDC31 /* Momentum.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Momentum.entitlements; sourceTree = "<group>"; };
 		857DFAAE6EF601435BFA75EC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -240,6 +243,7 @@
 		E8B596306101650E890995BE /* CareReconciliation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareReconciliation.swift; sourceTree = "<group>"; };
 		EACE83CB0C4A93124D0ECF85 /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
 		ED7DC642BB270ADDB827CB86 /* DailyReconciler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyReconciler.swift; sourceTree = "<group>"; };
+		EF23B33845A64667FDE09325 /* ModuleSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSetup.swift; sourceTree = "<group>"; };
 		F018DDCE60EAD0942DEEBA9A /* HistoryCorrectionTransactionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryCorrectionTransactionTests.swift; sourceTree = "<group>"; };
 		F071647C591AFBD2477AD68A /* HistoryHeatmapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryHeatmapView.swift; sourceTree = "<group>"; };
 		F2EDE51F9D931D1A32B92D3D /* ModuleEnablementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleEnablementStore.swift; sourceTree = "<group>"; };
@@ -388,6 +392,7 @@
 				0201B8A930F6158543DD016A /* CSVExportServiceTests.swift */,
 				1D5E04F7D6B69AB844A9958C /* DailyThreadFocusTests.swift */,
 				A3EF613E670CBB9FBE698C53 /* EmptyByDefaultTests.swift */,
+				83AFF36044D82F8EF459FEE3 /* EveningMergeFallbackTests.swift */,
 				F018DDCE60EAD0942DEEBA9A /* HistoryCorrectionTransactionTests.swift */,
 				DE8320054811E8FBF7C5B09A /* HistoryProjectionTests.swift */,
 				5B9CDA7344B427A10DC7CA0F /* HydrationModuleTests.swift */,
@@ -424,6 +429,7 @@
 				5854B858B13E27E908010D5D /* ModuleID.swift */,
 				7F5EC785C413FA6B001B2115 /* ModuleMetadata.swift */,
 				CC4FF7076D91E69DBE5C2D93 /* ModuleRegistry.swift */,
+				EF23B33845A64667FDE09325 /* ModuleSetup.swift */,
 				26176FF7C01B2AA7B3CF9ED9 /* MomentumModule.swift */,
 			);
 			path = Modules;
@@ -801,6 +807,7 @@
 				86486D706D385BC211C3E21B /* ModuleID.swift in Sources */,
 				F9A5F55E21BB31D38F352ED8 /* ModuleMetadata.swift in Sources */,
 				A9E59D6CDC013BEAFC1DE20D /* ModuleRegistry.swift in Sources */,
+				7CE5026E959B28B214AA1CC2 /* ModuleSetup.swift in Sources */,
 				93CF080CC4587919A6C24D4D /* MomentumApp.swift in Sources */,
 				123F0861D06F240B300AA52F /* MomentumDiagnostics.swift in Sources */,
 				D0064A15E87A621C99A6D9AB /* MomentumModule.swift in Sources */,
@@ -850,6 +857,7 @@
 				9380186BF062F43DEA685817 /* CSVExportServiceTests.swift in Sources */,
 				19B4004A7A12E977300D08BF /* DailyThreadFocusTests.swift in Sources */,
 				F58C30ACAF8218235463AC1B /* EmptyByDefaultTests.swift in Sources */,
+				9A2B004D742757D442F593DA /* EveningMergeFallbackTests.swift in Sources */,
 				766E16E4549B20247762925D /* HistoryCorrectionTransactionTests.swift in Sources */,
 				7DBA010A35B4FA8411CF8DBC /* HistoryProjectionTests.swift in Sources */,
 				8304DD5E47917381A305A177 /* HydrationModuleTests.swift in Sources */,
